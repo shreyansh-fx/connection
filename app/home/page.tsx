@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 
 // Plain anchor wrapper. No router or icon library required.
-const Link = ({ to, children, className, ...props }) => (
+type LinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & { to: string };
+const Link = ({ to, children, className, ...props }: LinkProps) => (
   <a href={to} className={className} {...props}>
     {children}
   </a>
@@ -232,7 +233,7 @@ function HowItWorks() {
 // ==========================================
 function EventCard({ event }) {
   // Color badge based on category
-  const getCategoryBadgeClass = (category) => {
+  const getCategoryBadgeClass = (category:any) => {
     switch (category.toLowerCase()) {
       case 'hackathon':
         return 'bg-purple-100 text-purple-700 border-purple-200';
