@@ -1,19 +1,14 @@
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 
 export default function LogoutButton() {
-  const supabase = createClient();
-
-  async function logout() {
-    await supabase.auth.signOut();
-    window.location.href = "/login";
-  }
+  const { signOut } = useAuth();
 
   return (
     <button
-      onClick={logout}
-      className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 shadow-sm"
+      onClick={() => signOut()}
+      className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 shadow-sm cursor-pointer"
     >
       Log Out
     </button>

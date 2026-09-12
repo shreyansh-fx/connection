@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import LogoutButton from "./LogoutButton";
+import Navbar from "@/components/Navbar";
 
 export default async function Dashboard() {
   const supabase = await createClient();
@@ -14,16 +14,31 @@ export default async function Dashboard() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-6 dark:bg-neutral-900 dark:text-white">
-      <div className="w-full max-w-md space-y-4 rounded-xl bg-white p-8 shadow-lg dark:bg-neutral-800 text-center">
-        <h1 className="text-3xl font-bold tracking-tight text-indigo-600 dark:text-indigo-400">
-          Dashboard
-        </h1>
-        <p className="text-sm text-gray-600 dark:text-neutral-300">
-          Logged in as <span className="font-semibold text-gray-900 dark:text-white">{user.email}</span>
-        </p>
-        <div className="pt-4">
-          <LogoutButton />
+    <main className="min-h-screen bg-slate-50">
+      <Navbar />
+
+      <div className="mx-auto max-w-4xl px-6 py-12">
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm text-center space-y-4">
+          <h1 className="text-3xl font-bold tracking-tight text-indigo-600">
+            Welcome to Campus Collab
+          </h1>
+          <p className="text-slate-600">
+            Logged in as <span className="font-semibold text-slate-900">{user.email}</span>
+          </p>
+          <div className="pt-4 flex justify-center gap-4">
+            <a
+              href="/profile"
+              className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition"
+            >
+              Edit Profile
+            </a>
+            <a
+              href="/profile/view"
+              className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+            >
+              View Profile
+            </a>
+          </div>
         </div>
       </div>
     </main>

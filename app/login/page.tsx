@@ -1,26 +1,32 @@
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
-import { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-  const supabase = createClient();
-  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const { user, loading: authLoading, signInWithGoogle } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      console.log("[LOGIN PAGE] User already authenticated, redirecting to /profile:", user.email);
+      router.push("/profile");
+    }
+  }, [user, authLoading, router]);
 
   async function handleGoogleLogin() {
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-
-    if (error) {
-      alert(error.message);
-      setLoading(false);
+    setSubmitting(true);
+    try {
+      await signInWithGoogle();
+    } catch (err: any) {
+      alert(err?.message || "Failed to start Google login");
+      setSubmitting(false);
     }
   }
+
+  const isButtonDisabled = authLoading || submitting;
 
   return (
     <div className="bg-surface font-body-md text-body-md text-on-surface antialiased min-h-screen flex flex-col justify-between">
@@ -255,11 +261,11 @@ export default function LoginPage() {
                 <div className="mt-space-lg flex flex-col gap-space-sm w-full">
                   <button
                     onClick={handleGoogleLogin}
-                    disabled={loading}
+                    disabled={isButtonDisabled}
                     type="button"
                     className="w-full h-12 px-space-md rounded-lg bg-surface-container-lowest hover:bg-surface-container-low active:scale-[0.99] transition-all duration-150 flex items-center justify-center gap-space-sm shadow-md cursor-pointer group disabled:opacity-75 disabled:pointer-events-none"
                   >
-                    {loading ? (
+                    {submitting ? (
                       <>
                         <span className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin"></span>
                         <span className="font-headline-sm text-body-lg text-on-surface font-semibold tracking-tight">

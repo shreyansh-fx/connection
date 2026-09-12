@@ -1,21 +1,102 @@
 "use client";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 
-export default function Profile() {
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { Profile } from "@/types/profile";
+import { useAuth } from "@/context/AuthContext";
+import Navbar from "@/components/Navbar";
+
+export default function ProfilePage() {
   const router = useRouter();
+  const supabase = createClient();
+  const { user, loading: authLoading } = useAuth();
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    branch: "",
+    full_name: "",
+    college: "",
+    course: "",
     year: "",
+    bio: "",
     skills: "",
     interests: "",
+    experience: "",
     achievements: "",
-    about: "",
+    github: "",
+    linkedin: "",
+    avatar_url: "",
   });
 
-  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    // If auth is done loading and there is no user, redirect to /login
+    if (!authLoading && !user) {
+      console.log("[PROFILE] No active session found, redirecting to /login");
+      router.push("/login");
+      return;
+    }
+
+    // If user is loaded, fetch their profile from Supabase
+    if (user) {
+      async function loadProfile() {
+        setProfileLoading(true);
+        console.log("[PROFILE] Fetching profile from Supabase for user:", user!.id);
+        const { data: profileData, error: profileError } = await supabase
+          .from("profile")
+          .select("*")
+          .eq("id", user!.id)
+          .maybeSingle();
+
+        if (profileError) {
+          console.error("[PROFILE] Error fetching profile:", profileError.message || profileError);
+          setErrorMessage(
+            `Failed to load profile from Supabase: ${profileError.message || JSON.stringify(profileError)}`
+          );
+        } else if (profileData) {
+          const p = profileData as Profile;
+          const formatFieldToString = (val: unknown) => {
+            if (!val) return "";
+            if (typeof val === "string") return val;
+            if (Array.isArray(val)) return val.join(", ");
+            return String(val);
+          };
+
+          setFormData({
+            full_name: p.full_name || "",
+            college: p.college || "",
+            course: p.course || "",
+            year: p.year || "",
+            bio: p.bio || "",
+            skills: formatFieldToString(p.skills),
+            interests: formatFieldToString(p.interests),
+            experience: p.experience || "",
+            achievements: p.achievements || "",
+            github: p.github || "",
+            linkedin: p.linkedin || "",
+            avatar_url:
+              p.avatar_url || user!.user_metadata?.avatar_url || "",
+          });
+        } else {
+          // Pre-fill default details from Google Auth metadata if available
+          setFormData((prev) => ({
+            ...prev,
+            full_name:
+              user!.user_metadata?.full_name ||
+              user!.user_metadata?.name ||
+              "",
+            avatar_url: user!.user_metadata?.avatar_url || "",
+          }));
+        }
+
+        setProfileLoading(false);
+      }
+
+      loadProfile();
+    }
+  }, [user, authLoading, router]);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -26,300 +107,412 @@ export default function Profile() {
       ...formData,
       [e.target.name]: e.target.value,
     });
-
-    setSaved(false);
+    setSuccessMessage(null);
+    setErrorMessage(null);
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    console.log("Profile saved:", formData);
+    if (!user) {
+      setErrorMessage("Your session has expired. Please log in again.");
+      router.push("/login");
+      return;
+    }
 
-    router.push("/profile/view");
+    if (!formData.full_name.trim()) {
+      setErrorMessage("Full Name is required.");
+      return;
+    }
+
+    setSaving(true);
+    setSuccessMessage(null);
+    setErrorMessage(null);
+
+    const payload = {
+      id: user.id,
+      full_name: formData.full_name.trim(),
+      college: formData.college.trim() || null,
+      course: formData.course.trim() || null,
+      year: formData.year || null,
+      bio: formData.bio.trim() || null,
+      skills: formData.skills.trim() || null,
+      interests: formData.interests.trim() || null,
+      experience: formData.experience.trim() || null,
+      achievements: formData.achievements.trim() || null,
+      github: formData.github.trim() || null,
+      linkedin: formData.linkedin.trim() || null,
+      avatar_url: formData.avatar_url.trim() || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    console.log("[PROFILE] Upserting profile to Supabase with ID:", user.id);
+    const { error } = await supabase
+      .from("profile")
+      .upsert(payload, { onConflict: "id" });
+
+    setSaving(false);
+
+    if (error) {
+      const errMsg = error.message || error.details || error.hint || JSON.stringify(error);
+      console.error("[PROFILE] Profile save error:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      });
+
+      if (error.code === "42501" || errMsg.includes("row-level security")) {
+        setErrorMessage(
+          "Supabase RLS Policy Error: Row-Level Security on 'public.profile' blocked this operation. Please add an INSERT/UPDATE policy in Supabase SQL editor or temporarily disable RLS."
+        );
+      } else {
+        setErrorMessage(`Save failed: ${errMsg}`);
+      }
+    } else {
+      setSuccessMessage("✓ Profile saved successfully to Supabase!");
+    }
   };
+
+  if (authLoading || (user && profileLoading)) {
+    return (
+      <main className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-slate-600">
+          <div className="w-8 h-8 rounded-full border-4 border-indigo-600 border-t-transparent animate-spin"></div>
+          <p className="text-sm font-medium">Checking authentication and profile...</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-slate-50">
+      {/* Shared Navbar */}
+      <Navbar />
 
-      {/* Navbar */}
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-
-          <h1 className="text-2xl font-bold text-indigo-600">
-            CampusCollabi
-          </h1>
-
-          <nav className="flex gap-8 text-sm font-medium">
-            <a href="/" className="text-slate-600 hover:text-indigo-600">
-              Home
-            </a>
-
-            <a href="/events" className="text-slate-600 hover:text-indigo-600">
-              Events
-            </a>
-
-            <a href="/teams" className="text-slate-600 hover:text-indigo-600">
-              My Teams
-            </a>
-
-            <a
-              href="/profile"
-              className="font-semibold text-indigo-600"
-            >
-              Profile
-            </a>
-          </nav>
-
-        </div>
-      </header>
-
-
-      {/* Page */}
+      {/* Main Container */}
       <div className="mx-auto max-w-4xl px-6 py-12">
-
-        {/* Heading */}
+        {/* Page Heading */}
         <div className="mb-8">
           <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-indigo-600">
             Your Profile
           </p>
-
           <h2 className="text-4xl font-bold tracking-tight text-slate-900">
             Tell us about yourself
           </h2>
-
           <p className="mt-3 text-slate-500">
-            Your profile helps CampusCollabi find teammates whose skills
-            complement yours.
+            Your profile helps Campus Collab match you with relevant teammates and opportunities across campus.
           </p>
         </div>
 
+        {/* Feedback Messages */}
+        {successMessage && (
+          <div className="mb-6 rounded-lg bg-green-50 p-4 border border-green-200 text-sm font-medium text-green-700 flex items-center justify-between">
+            <span>{successMessage}</span>
+            <button
+              type="button"
+              onClick={() => setSuccessMessage(null)}
+              className="text-green-500 hover:text-green-800"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
-        {/* Form */}
+        {errorMessage && (
+          <div className="mb-6 rounded-lg bg-red-50 p-4 border border-red-200 text-sm font-medium text-red-700 flex items-center justify-between">
+            <div className="flex flex-col gap-1">
+              <span className="font-semibold">Error saving profile:</span>
+              <span>{errorMessage}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setErrorMessage(null)}
+              className="text-red-500 hover:text-red-800"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Profile Form */}
         <form
           onSubmit={handleSubmit}
           className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"
         >
-
-          {/* Personal Information */}
+          {/* Section: Personal Information */}
           <section>
             <h3 className="text-xl font-semibold text-slate-900">
               Personal Information
             </h3>
-
             <p className="mt-1 text-sm text-slate-500">
-              Basic information about you.
+              Basic identification and academic details.
             </p>
 
-
             <div className="mt-6 grid gap-6 md:grid-cols-2">
-
-              {/* Name */}
+              {/* Full Name */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Full Name
+                  Full Name <span className="text-red-500">*</span>
                 </label>
-
                 <input
                   type="text"
-                  name="name"
-                  value={formData.name}
+                  name="full_name"
+                  value={formData.full_name}
                   onChange={handleChange}
-                  placeholder="Enter your name"
+                  placeholder="Rahul Sharma"
                   required
-                  className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                  className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
                 />
               </div>
 
-
-              {/* Email */}
+              {/* College */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Email
+                  College / University
                 </label>
-
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="you@iiitdmj.ac.in"
-                  required
-                  className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                />
-              </div>
-
-
-              {/* Branch */}
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Branch
-                </label>
-
                 <input
                   type="text"
-                  name="branch"
-                  value={formData.branch}
+                  name="college"
+                  value={formData.college}
                   onChange={handleChange}
-                  placeholder="e.g. CSE"
-                  className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                  placeholder="e.g. IIITDM Jabalpur"
+                  className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
                 />
               </div>
 
-
-              {/* Year */}
+              {/* Course / Branch */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Year
+                  Course / Branch
                 </label>
+                <input
+                  type="text"
+                  name="course"
+                  value={formData.course}
+                  onChange={handleChange}
+                  placeholder="e.g. Computer Science Engineering"
+                  className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
+                />
+              </div>
 
+              {/* Academic Year */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Academic Year
+                </label>
                 <select
                   name="year"
                   value={formData.year}
                   onChange={handleChange}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
                 >
                   <option value="">Select year</option>
                   <option value="1st Year">1st Year</option>
                   <option value="2nd Year">2nd Year</option>
                   <option value="3rd Year">3rd Year</option>
                   <option value="4th Year">4th Year</option>
+                  <option value="Postgraduate">Postgraduate</option>
+                  <option value="PhD">PhD</option>
                 </select>
               </div>
-
             </div>
           </section>
 
-
-          {/* Divider */}
           <div className="my-10 border-t border-slate-200" />
 
-
-          {/* Skills */}
+          {/* Section: Bio / About */}
           <section>
-
-            <h3 className="text-xl font-semibold text-slate-900">
-              Skills
-            </h3>
-
+            <h3 className="text-xl font-semibold text-slate-900">Bio</h3>
             <p className="mt-1 text-sm text-slate-500">
-              What can you contribute to a team?
+              A brief introduction for prospective teammates.
             </p>
+            <textarea
+              name="bio"
+              value={formData.bio}
+              onChange={handleChange}
+              rows={3}
+              placeholder="Full-stack developer interested in AI/ML hackathons and open-source software..."
+              className="mt-5 w-full resize-none rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
+            />
+          </section>
 
+          <div className="my-10 border-t border-slate-200" />
+
+          {/* Section: Skills */}
+          <section>
+            <h3 className="text-xl font-semibold text-slate-900">Skills</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Technical, design, or leadership capabilities.
+            </p>
             <div className="mt-5">
               <input
                 type="text"
                 name="skills"
                 value={formData.skills}
                 onChange={handleChange}
-                placeholder="e.g. Python, React, UI/UX, C++, Public Speaking"
-                className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                placeholder="React, Python, UI/UX, C++, TypeScript"
+                className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
               />
-
               <p className="mt-2 text-xs text-slate-400">
                 Separate multiple skills with commas.
               </p>
             </div>
-
           </section>
 
+          <div className="my-10 border-t border-slate-200" />
 
-          {/* Interests */}
-          <section className="mt-10">
-
-            <h3 className="text-xl font-semibold text-slate-900">
-              Interests
-            </h3>
-
+          {/* Section: Interests */}
+          <section>
+            <h3 className="text-xl font-semibold text-slate-900">Interests</h3>
             <p className="mt-1 text-sm text-slate-500">
-              What activities or areas are you interested in?
+              Domain focus or event types you want to work on.
             </p>
-
             <div className="mt-5">
-
               <input
                 type="text"
                 name="interests"
                 value={formData.interests}
                 onChange={handleChange}
-                placeholder="e.g. Hackathons, AI/ML, Cultural Events, Sports"
-                className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                placeholder="Hackathons, Music, AI, Robotics, Web3"
+                className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
               />
-
-            </div>
-
-          </section>
-
-
-          {/* Achievements */}
-          <section className="mt-10">
-
-            <h3 className="text-xl font-semibold text-slate-900">
-              Achievements
-            </h3>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Tell us about competitions, projects, certifications, etc.
-            </p>
-
-            <textarea
-              name="achievements"
-              value={formData.achievements}
-              onChange={handleChange}
-              rows={4}
-              placeholder="e.g. Hackathon finalist, built an ML project, won a coding competition..."
-              className="mt-5 w-full resize-none rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-            />
-
-          </section>
-
-
-          {/* About */}
-          <section className="mt-10">
-
-            <h3 className="text-xl font-semibold text-slate-900">
-              About You
-            </h3>
-
-            <p className="mt-1 text-sm text-slate-500">
-              What kind of teammates or opportunities are you looking for?
-            </p>
-
-            <textarea
-              name="about"
-              value={formData.about}
-              onChange={handleChange}
-              rows={4}
-              placeholder="Tell us what you enjoy working on and what you're looking for in a team..."
-              className="mt-5 w-full resize-none rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-            />
-
-          </section>
-
-
-          {/* Save */}
-          <div className="mt-10 flex items-center justify-between border-t border-slate-200 pt-6">
-
-            {saved && (
-              <p className="text-sm font-medium text-green-600">
-                ✓ Profile saved successfully!
+              <p className="mt-2 text-xs text-slate-400">
+                Separate multiple interests with commas.
               </p>
-            )}
+            </div>
+          </section>
 
-            {!saved && <div />}
+          <div className="my-10 border-t border-slate-200" />
+
+          {/* Section: Experience & Achievements */}
+          <section>
+            <h3 className="text-xl font-semibold text-slate-900">
+              Experience &amp; Achievements
+            </h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Highlights of your practical work, past teams, and recognitions.
+            </p>
+
+            <div className="mt-6 grid gap-6">
+              {/* Experience */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Relevant Experience
+                </label>
+                <textarea
+                  name="experience"
+                  value={formData.experience}
+                  onChange={handleChange}
+                  rows={3}
+                  placeholder="Built a full-stack Next.js app, interned at a software startup..."
+                  className="w-full resize-none rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
+                />
+              </div>
+
+              {/* Achievements */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Key Achievements
+                </label>
+                <textarea
+                  name="achievements"
+                  value={formData.achievements}
+                  onChange={handleChange}
+                  rows={3}
+                  placeholder="Winner of College Hackathon 2024, Published paper on computer vision..."
+                  className="w-full resize-none rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
+                />
+              </div>
+            </div>
+          </section>
+
+          <div className="my-10 border-t border-slate-200" />
+
+          {/* Section: External Links & Avatar */}
+          <section>
+            <h3 className="text-xl font-semibold text-slate-900">
+              Social Links &amp; Avatar
+            </h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Connect your online presence and profile picture.
+            </p>
+
+            <div className="mt-6 grid gap-6 md:grid-cols-2">
+              {/* GitHub */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  GitHub Profile
+                </label>
+                <input
+                  type="text"
+                  name="github"
+                  value={formData.github}
+                  onChange={handleChange}
+                  placeholder="https://github.com/yourusername"
+                  className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
+                />
+              </div>
+
+              {/* LinkedIn */}
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  LinkedIn Profile
+                </label>
+                <input
+                  type="text"
+                  name="linkedin"
+                  value={formData.linkedin}
+                  onChange={handleChange}
+                  placeholder="https://linkedin.com/in/yourusername"
+                  className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
+                />
+              </div>
+
+              {/* Avatar URL */}
+              <div className="md:col-span-2">
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Avatar Image URL
+                </label>
+                <input
+                  type="text"
+                  name="avatar_url"
+                  value={formData.avatar_url}
+                  onChange={handleChange}
+                  placeholder="https://example.com/avatar.jpg"
+                  className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Action Footer */}
+          <div className="mt-10 flex items-center justify-between border-t border-slate-200 pt-6">
+            <button
+              type="button"
+              onClick={() => router.push("/profile/view")}
+              className="rounded-lg border border-slate-300 px-5 py-2.5 font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+            >
+              View Profile
+            </button>
 
             <button
               type="submit"
-              className="rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white transition hover:bg-indigo-700"
+              disabled={saving}
+              className="rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
             >
-              Save Profile
+              {saving ? (
+                <>
+                  <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+                  <span>Saving to Supabase...</span>
+                </>
+              ) : (
+                <span>Save Profile</span>
+              )}
             </button>
-
           </div>
-
         </form>
-
       </div>
-
     </main>
   );
 }
