@@ -6,111 +6,105 @@ import { useAuth } from "@/context/AuthContext";
 
 export default function Navbar() {
   const pathname = usePathname();
-  const { user, signOut } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
 
   const handleLogout = async () => {
     setLoggingOut(true);
+
     try {
       await signOut();
-    } catch (e) {
-      console.error("[NAVBAR] Logout error:", e);
+    } catch (error) {
+      console.error("[NAVBAR] Logout error:", error);
       setLoggingOut(false);
     }
   };
 
   return (
-    <header className="border-b border-slate-200 bg-white sticky top-0 z-50">
+    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        {/* Brand */}
-        <a href="/dashboard" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-lg">
+
+        {/* CampusCollab Logo */}
+        <a href="/" className="flex items-center gap-2">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-lg font-bold text-white">
             C
           </div>
-          <span className="text-xl font-bold text-indigo-600 tracking-tight">
-            Campus Collab
+
+          <span className="text-xl font-bold tracking-tight text-indigo-600">
+            CampusCollab
           </span>
         </a>
 
-        {/* Nav Links */}
+        {/* Navigation */}
         <nav className="flex items-center gap-6 text-sm font-medium">
+
           <a
-            href="/dashboard"
+            href="/"
             className={
-              pathname === "/dashboard"
-                ? "font-semibold text-indigo-600"
-                : "text-slate-600 hover:text-indigo-600 transition"
+              pathname === "/" || pathname === "/home"
+                ? "rounded-full bg-indigo-500 px-5 py-2 text-white"
+                : "text-slate-600 transition hover:text-indigo-600"
             }
           >
-            Dashboard
+            Home
           </a>
-          <a
-            href="/profile/view"
-            className={
-              pathname === "/profile/view"
-                ? "font-semibold text-indigo-600"
-                : "text-slate-600 hover:text-indigo-600 transition"
-            }
-          >
-            View Profile
-          </a>
-          <a
-            href="/profile"
-            className={
-              pathname === "/profile"
-                ? "font-semibold text-indigo-600"
-                : "text-slate-600 hover:text-indigo-600 transition"
-            }
-          >
-            Edit Profile
-          </a>
+
           <a
             href="/events"
             className={
-              pathname.startsWith("/events") || pathname.startsWith("/requests")
+              pathname.startsWith("/events") ||
+                pathname.startsWith("/requests")
                 ? "font-semibold text-indigo-600"
-                : "text-slate-600 hover:text-indigo-600 transition"
+                : "text-slate-600 transition hover:text-indigo-600"
             }
           >
             Events
           </a>
+
         </nav>
 
-        {/* User Info & Logout */}
-        <div className="flex items-center gap-4">
-          {user ? (
-            <div className="flex items-center gap-3">
-              {user.user_metadata?.avatar_url ? (
-                <img
-                  src={user.user_metadata.avatar_url}
-                  alt="User avatar"
-                  className="w-8 h-8 rounded-full border border-slate-200 object-cover"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-semibold text-xs">
-                  {user.email?.charAt(0).toUpperCase()}
-                </div>
-              )}
-              <span className="hidden md:inline-block text-xs font-medium text-slate-600 truncate max-w-[150px]">
-                {user.email}
-              </span>
+        {/* Login / Profile */}
+        <div className="flex items-center gap-3">
+
+          {loading ? null : user ? (
+            <>
+              <a
+                href="/profile/view"
+                className="flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-indigo-300 hover:text-indigo-600"
+              >
+                {user.user_metadata?.avatar_url ? (
+                  <img
+                    src={user.user_metadata.avatar_url}
+                    alt="Profile"
+                    className="h-8 w-8 rounded-full border border-slate-200 object-cover"
+                  />
+                ) : (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white">
+                    {user.email?.charAt(0).toUpperCase() || "U"}
+                  </div>
+                )}
+
+                <span>Profile</span>
+              </a>
+
               <button
                 type="button"
                 onClick={handleLogout}
                 disabled={loggingOut}
-                className="rounded-lg bg-red-50 px-3.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 transition border border-red-200 disabled:opacity-50 cursor-pointer"
+                className="text-sm font-medium text-slate-600 transition hover:text-red-600 disabled:opacity-50"
               >
                 {loggingOut ? "Logging out..." : "Log Out"}
               </button>
-            </div>
+            </>
           ) : (
             <a
               href="/login"
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition"
+              className="text-sm font-medium text-slate-700 transition hover:text-indigo-600"
             >
-              Sign In
+              Login
             </a>
           )}
+
         </div>
       </div>
     </header>

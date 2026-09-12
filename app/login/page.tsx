@@ -3,6 +3,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -33,14 +34,14 @@ export default function LoginPage() {
       {/* Header */}
       <header className="w-full border-b border-outline-variant bg-surface-container-lowest/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-margin-mobile md:px-margin h-16 flex items-center justify-between">
-          <div className="flex items-center gap-space-sm">
+          <Link href="/" className="flex items-center gap-space-sm">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-on-primary font-headline-sm font-bold text-headline-sm">
               C
             </div>
             <span className="font-headline-sm text-headline-sm text-on-surface font-semibold tracking-tight">
               Campus Collab
             </span>
-          </div>
+          </Link>
           <div className="flex items-center gap-space-xs px-2.5 py-1 rounded-full bg-surface-container-low border border-outline-variant">
             <span className="w-2 h-2 rounded-full bg-primary-container animate-pulse"></span>
             <span className="font-label-sm text-label-sm text-on-surface-variant font-medium">
