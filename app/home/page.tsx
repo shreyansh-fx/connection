@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState } from "react";
 
 // Plain anchor wrapper. No router or icon library required.
@@ -231,7 +233,7 @@ function HowItWorks() {
 // ==========================================
 // 5. EVENT CARD (components/EventCard.jsx)
 // ==========================================
-function EventCard({ event }) {
+function EventCard({ event }: { event: { id: number; name: string; category: string; date: string; description: string } }) {
   // Color badge based on category
   const getCategoryBadgeClass = (category:any) => {
     switch (category.toLowerCase()) {
@@ -397,7 +399,7 @@ function MatchingSection() {
 
   const [selectedSkills, setSelectedSkills] = useState(["Coding", "UI/UX"]);
 
-  const toggleSkill = (skill) => {
+  const toggleSkill = (skill: string) => {
     if (selectedSkills.includes(skill)) {
       setSelectedSkills(selectedSkills.filter(s => s !== skill));
     } else {
@@ -582,7 +584,6 @@ function Home() {
       <main className="flex-grow">
         <HeroSection />
         <HowItWorks />
-        <FeatureSection />
         <UpcomingEvents />
         <MatchingSection />
         <FinalCTA />

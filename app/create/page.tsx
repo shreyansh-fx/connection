@@ -1,7 +1,16 @@
+"use client";
+
+import { FormEvent, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import Navbar from "@/components/Navbar";
+import { useAuth } from "@/context/AuthContext";
+import { createClient } from "@/lib/supabase/client";
+
+const categories = ["Cultural", "Technology", "Sports", "Academic", "Music", "Other"];
+
 export default function CreatePage() {
-  return (
-    <main style={{ padding: "2rem" }}>
-      <h1>Create</h1>
-    </main>
-  );
+  const router = useRouter(); const supabase = useMemo(() => createClient(), []); const { user, loading } = useAuth(); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!user) return router.push("/login"); const form = new FormData(event.currentTarget); setSaving(true); setError(""); const { data, error } = await supabase.from("events").insert({ name: form.get("name"), description: form.get("description"), category: form.get("category"), date: form.get("date"), location: form.get("location"), image_url: form.get("image_url") || null, created_by: user.id }).select("id").single(); setSaving(false); if (error) setError(error.message); else router.push(`/events/${data.id}`); }
+  if (!loading && !user) { router.push("/login"); return null; }
+  return <main className="min-h-screen bg-slate-50"><Navbar /><section className="mx-auto max-w-2xl px-6 py-12"><a href="/events" className="text-sm font-semibold text-indigo-600">← Back to events</a><div className="mt-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><h1 className="text-3xl font-bold text-slate-900">Create an event</h1><p className="mt-2 text-slate-600">Add a real campus event so students can find collaborators for it.</p><form onSubmit={submit} className="mt-7 space-y-5"><label className="block text-sm font-medium text-slate-700">Event name<input required name="name" className="mt-1 w-full rounded-lg border border-slate-300 p-3" placeholder="Ganesh Utsav" /></label><div className="grid gap-5 sm:grid-cols-2"><label className="block text-sm font-medium text-slate-700">Category<select required name="category" defaultValue="" className="mt-1 w-full rounded-lg border border-slate-300 bg-white p-3"><option value="" disabled>Select category</option>{categories.map((category) => <option key={category}>{category}</option>)}</select></label><label className="block text-sm font-medium text-slate-700">Date<input required type="date" name="date" className="mt-1 w-full rounded-lg border border-slate-300 p-3" /></label></div><label className="block text-sm font-medium text-slate-700">Location<input required name="location" className="mt-1 w-full rounded-lg border border-slate-300 p-3" placeholder="College auditorium" /></label><label className="block text-sm font-medium text-slate-700">Description<textarea required name="description" className="mt-1 min-h-32 w-full rounded-lg border border-slate-300 p-3" placeholder="What is happening, and what collaborators might be needed?" /></label><label className="block text-sm font-medium text-slate-700">Image URL <span className="font-normal text-slate-400">optional</span><input type="url" name="image_url" className="mt-1 w-full rounded-lg border border-slate-300 p-3" placeholder="https://…" /></label>{error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}<button disabled={saving || loading} className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60">{saving ? "Creating event…" : "Create event"}</button></form></div></section></main>;
 }

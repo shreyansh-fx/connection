@@ -64,6 +64,16 @@ export default function Navbar() {
           >
             Edit Profile
           </a>
+          <a
+            href="/events"
+            className={
+              pathname.startsWith("/events") || pathname.startsWith("/requests")
+                ? "font-semibold text-indigo-600"
+                : "text-slate-600 hover:text-indigo-600 transition"
+            }
+          >
+            Events
+          </a>
         </nav>
 
         {/* User Info & Logout */}
