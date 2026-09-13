@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   const supabase = createPublicClient();
@@ -19,8 +19,8 @@ export async function GET(
         profile:creator_id (
           id,
           full_name,
-          college,
-          course,
+          gender,
+          branch,
           year,
           bio,
           skills,
@@ -30,23 +30,29 @@ export async function GET(
           github,
           linkedin,
           avatar_url
-        )`
+        )`,
       )
       .eq("event_id", id)
       .order("created_at", { ascending: false }),
   ]);
 
   if (eventResult.error) {
-    console.error("[API /public/events/[id]] Event fetch error:", eventResult.error);
+    console.error(
+      "[API /public/events/[id]] Event fetch error:",
+      eventResult.error,
+    );
     const status = eventResult.error.code === "PGRST116" ? 404 : 500;
     return NextResponse.json(
       { error: eventResult.error.message ?? "Event not found" },
-      { status }
+      { status },
     );
   }
 
   if (requestsResult.error) {
-    console.error("[API /public/events/[id]] Requests fetch error:", requestsResult.error);
+    console.error(
+      "[API /public/events/[id]] Requests fetch error:",
+      requestsResult.error,
+    );
     // Return the event even if requests fail — don't block the whole page
     return NextResponse.json({
       event: eventResult.data,

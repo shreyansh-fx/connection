@@ -1,8 +1,8 @@
 export interface Profile {
   id: string;
   full_name: string | null;
-  college: string | null;
-  course: string | null;
+  gender: string | null;
+  branch: string | null;
   year: string | null;
   bio: string | null;
   skills: string | string[] | null;

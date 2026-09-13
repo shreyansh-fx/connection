@@ -8,7 +8,10 @@ import Navbar from "@/components/Navbar";
 function parseArrayField(field: unknown): string[] {
   if (!field) return [];
   if (Array.isArray(field)) {
-    return field.map(String).map((s) => s.trim()).filter(Boolean);
+    return field
+      .map(String)
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
   if (typeof field === "string") {
     const trimmed = field.trim();
@@ -16,11 +19,17 @@ function parseArrayField(field: unknown): string[] {
       try {
         const parsed = JSON.parse(trimmed);
         if (Array.isArray(parsed)) {
-          return parsed.map(String).map((s) => s.trim()).filter(Boolean);
+          return parsed
+            .map(String)
+            .map((s) => s.trim())
+            .filter(Boolean);
         }
       } catch {}
     }
-    return trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+    return trimmed
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
   return [];
 }
@@ -43,11 +52,9 @@ export default function ProfileView({
   const router = useRouter();
 
   const displayName =
-    profile.full_name ||
-    (isOwner ? userEmail : null) ||
-    "Student Profile";
+    profile.full_name || (isOwner ? userEmail : null) || "Student Profile";
 
-  const displaySubtitle = [profile.course, profile.year, profile.college]
+  const displaySubtitle = [profile.branch, profile.year, profile.gender]
     .filter(Boolean)
     .join(" • ");
 
@@ -144,7 +151,9 @@ export default function ProfileView({
                 ))}
               </div>
             ) : (
-              <p className="mt-2 text-sm text-slate-400 italic">No skills listed yet.</p>
+              <p className="mt-2 text-sm text-slate-400 italic">
+                No skills listed yet.
+              </p>
             )}
           </section>
 
@@ -163,14 +172,18 @@ export default function ProfileView({
                 ))}
               </div>
             ) : (
-              <p className="mt-2 text-sm text-slate-400 italic">No interests listed yet.</p>
+              <p className="mt-2 text-sm text-slate-400 italic">
+                No interests listed yet.
+              </p>
             )}
           </section>
 
           {/* Experience */}
           {profile.experience && (
             <section className="mt-8">
-              <h3 className="text-lg font-semibold text-slate-900">Experience</h3>
+              <h3 className="text-lg font-semibold text-slate-900">
+                Experience
+              </h3>
               <p className="mt-2 leading-7 text-slate-600 whitespace-pre-line">
                 {profile.experience}
               </p>
@@ -180,7 +193,9 @@ export default function ProfileView({
           {/* Achievements */}
           {profile.achievements && (
             <section className="mt-8">
-              <h3 className="text-lg font-semibold text-slate-900">Achievements</h3>
+              <h3 className="text-lg font-semibold text-slate-900">
+                Achievements
+              </h3>
               <p className="mt-2 leading-7 text-slate-600 whitespace-pre-line">
                 {profile.achievements}
               </p>

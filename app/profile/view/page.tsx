@@ -21,8 +21,8 @@ export default function ProfileFormPage() {
 
   const [formData, setFormData] = useState({
     full_name: "",
-    college: "",
-    course: "",
+    gender: "",
+    branch: "",
     year: "",
     bio: "",
     skills: "",
@@ -37,7 +37,9 @@ export default function ProfileFormPage() {
   useEffect(() => {
     // If auth is done loading and there is no user, redirect to /login
     if (!authLoading && !user) {
-      console.log("[PROFILE FORM] No active session found, redirecting to /login");
+      console.log(
+        "[PROFILE FORM] No active session found, redirecting to /login",
+      );
       router.push("/login");
       return;
     }
@@ -47,15 +49,22 @@ export default function ProfileFormPage() {
       let isMounted = true;
       async function loadProfile() {
         setProfileLoading(true);
-        console.log("[PROFILE FORM] Fetching profile from Supabase for user:", user!.id);
-        const { profile: profileData, error: profileError } = await fetchUserProfile(supabase, user!.id);
+        console.log(
+          "[PROFILE FORM] Fetching profile from Supabase for user:",
+          user!.id,
+        );
+        const { profile: profileData, error: profileError } =
+          await fetchUserProfile(supabase, user!.id);
 
         if (!isMounted) return;
 
         if (profileError) {
-          console.error("[PROFILE FORM] Error fetching profile:", profileError.message || profileError);
+          console.error(
+            "[PROFILE FORM] Error fetching profile:",
+            profileError.message || profileError,
+          );
           setErrorMessage(
-            `Failed to load profile from Supabase: ${profileError.message || JSON.stringify(profileError)}`
+            `Failed to load profile from Supabase: ${profileError.message || JSON.stringify(profileError)}`,
           );
         } else if (profileData) {
           setIsEditMode(true);
@@ -69,8 +78,8 @@ export default function ProfileFormPage() {
 
           setFormData({
             full_name: p.full_name || "",
-            college: p.college || "",
-            course: p.course || "",
+            gender: p.gender || "",
+            branch: p.branch || "",
             year: p.year || "",
             bio: p.bio || "",
             skills: formatFieldToString(p.skills),
@@ -79,8 +88,7 @@ export default function ProfileFormPage() {
             achievements: p.achievements || "",
             github: p.github || "",
             linkedin: p.linkedin || "",
-            avatar_url:
-              p.avatar_url || user!.user_metadata?.avatar_url || "",
+            avatar_url: p.avatar_url || user!.user_metadata?.avatar_url || "",
           });
         } else {
           setIsEditMode(false);
@@ -88,9 +96,7 @@ export default function ProfileFormPage() {
           setFormData((prev) => ({
             ...prev,
             full_name:
-              user!.user_metadata?.full_name ||
-              user!.user_metadata?.name ||
-              "",
+              user!.user_metadata?.full_name || user!.user_metadata?.name || "",
             avatar_url: user!.user_metadata?.avatar_url || "",
           }));
         }
@@ -109,7 +115,7 @@ export default function ProfileFormPage() {
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    >,
   ) => {
     setFormData({
       ...formData,
@@ -140,8 +146,8 @@ export default function ProfileFormPage() {
     const payload = {
       id: user.id,
       full_name: formData.full_name.trim(),
-      college: formData.college.trim() || null,
-      course: formData.course.trim() || null,
+      gender: formData.gender.trim() || null,
+      branch: formData.branch.trim() || null,
       year: formData.year || null,
       bio: formData.bio.trim() || null,
       skills: formData.skills.trim() || null,
@@ -160,7 +166,8 @@ export default function ProfileFormPage() {
     setSaving(false);
 
     if (error) {
-      const errMsg = error.message || error.details || error.hint || JSON.stringify(error);
+      const errMsg =
+        error.message || error.details || error.hint || JSON.stringify(error);
       console.error("[PROFILE FORM] Profile save error:", {
         message: error.message,
         details: error.details,
@@ -170,13 +177,15 @@ export default function ProfileFormPage() {
 
       if (error.code === "42501" || errMsg.includes("row-level security")) {
         setErrorMessage(
-          "Supabase RLS Policy Error: Row-Level Security on 'public.profile' blocked this operation. Please add an INSERT/UPDATE policy in Supabase SQL editor or temporarily disable RLS."
+          "Supabase RLS Policy Error: Row-Level Security on 'public.profile' blocked this operation. Please add an INSERT/UPDATE policy in Supabase SQL editor or temporarily disable RLS.",
         );
       } else {
         setErrorMessage(`Save failed: ${errMsg}`);
       }
     } else {
-      console.log("[PROFILE FORM] Profile saved successfully. Redirecting to /profile");
+      console.log(
+        "[PROFILE FORM] Profile saved successfully. Redirecting to /profile",
+      );
       setSuccessMessage("✓ Profile saved successfully!");
       router.push("/profile");
     }
@@ -187,7 +196,9 @@ export default function ProfileFormPage() {
       <main className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3 text-slate-600">
           <div className="w-8 h-8 rounded-full border-4 border-indigo-600 border-t-transparent animate-spin"></div>
-          <p className="text-sm font-medium">Checking authentication and profile...</p>
+          <p className="text-sm font-medium">
+            Checking authentication and profile...
+          </p>
         </div>
       </main>
     );
@@ -276,34 +287,43 @@ export default function ProfileFormPage() {
                 />
               </div>
 
-              {/* College */}
+              {/* Gender */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
-                  College / University
+                  Gender
                 </label>
-                <input
-                  type="text"
-                  name="college"
-                  value={formData.college}
+                <select
+                  name="gender"
+                  value={formData.gender}
                   onChange={handleChange}
-                  placeholder="e.g. IIITDM Jabalpur"
-                  className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
-                />
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
+                >
+                  <option value="">Select gender</option>
+                  <option value="Female">Female</option>
+                  <option value="Male">Male</option>
+                  <option value="Non-binary">Non-binary</option>
+                  <option value="Prefer not to say">Prefer not to say</option>
+                </select>
               </div>
 
-              {/* Course / Branch */}
+              {/* Branch */}
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Course / Branch
+                  Branch
                 </label>
-                <input
-                  type="text"
-                  name="course"
-                  value={formData.course}
+                <select
+                  name="branch"
+                  value={formData.branch}
                   onChange={handleChange}
-                  placeholder="e.g. Computer Science Engineering"
-                  className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
-                />
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
+                >
+                  <option value="">Select branch</option>
+                  <option value="CSE">CSE</option>
+                  <option value="ECE">ECE</option>
+                  <option value="BDS">BDS</option>
+                  <option value="SM">SM</option>
+                  <option value="ME">ME</option>
+                </select>
               </div>
 
               {/* Academic Year */}

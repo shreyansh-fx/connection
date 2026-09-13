@@ -390,9 +390,9 @@ export default function RequestDetailPage() {
                               )}
                               <p className="text-xs text-slate-500">
                                 {[
-                                  application.profile?.course,
+                                  application.profile?.branch,
                                   application.profile?.year,
-                                  application.profile?.college,
+                                  application.profile?.gender,
                                 ]
                                   .filter(Boolean)
                                   .join(" · ")}
@@ -507,9 +507,9 @@ export default function RequestDetailPage() {
                 )}
                 <p className="text-sm text-slate-600">
                   {[
-                    request.profile?.course,
+                    request.profile?.branch,
                     request.profile?.year,
-                    request.profile?.college,
+                    request.profile?.gender,
                   ]
                     .filter(Boolean)
                     .join(" · ")}
