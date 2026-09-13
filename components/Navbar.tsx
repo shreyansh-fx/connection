@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { createClient } from "@/lib/supabase/client";
@@ -36,10 +36,30 @@ export default function Navbar() {
   const pathname = usePathname();
   const { user, loading, signOut } = useAuth();
   const supabase = useMemo(() => createClient(), []);
+  const notificationRef = useRef<HTMLDivElement | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isNotificationOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(event.target as Node)
+      ) {
+        setIsNotificationOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [isNotificationOpen]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -124,6 +144,34 @@ export default function Navbar() {
     };
   }, [supabase, user?.id]);
 
+  const markAllNotificationsAsRead = async () => {
+    if (!user || !notifications.some((notification) => !notification.is_read)) {
+      return;
+    }
+
+    const { error } = await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("user_id", user.id)
+      .eq("is_read", false);
+
+    if (error) {
+      console.error(
+        "[NAVBAR] Failed to mark all notifications as read:",
+        error.message,
+      );
+      return;
+    }
+
+    setNotifications((previous) =>
+      previous.map((notification) => ({
+        ...notification,
+        is_read: true,
+      })),
+    );
+    setUnreadCount(0);
+  };
+
   const handleLogout = async () => {
     setLoggingOut(true);
 
@@ -200,10 +248,15 @@ export default function Navbar() {
         <div className="flex items-center gap-3">
           {loading ? null : user ? (
             <>
-              <div className="relative">
+              <div className="relative" ref={notificationRef}>
                 <button
                   type="button"
-                  onClick={() => setIsNotificationOpen((previous) => !previous)}
+                  onClick={() => {
+                    if (!isNotificationOpen && user) {
+                      void markAllNotificationsAsRead();
+                    }
+                    setIsNotificationOpen((previous) => !previous);
+                  }}
                   className="relative flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-xl transition hover:border-indigo-300 hover:text-indigo-600"
                   aria-label="Notifications"
                 >
