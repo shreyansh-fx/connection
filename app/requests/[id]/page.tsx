@@ -79,26 +79,26 @@ export default function RequestDetailPage() {
           .eq("status", "accepted"),
         user
           ? supabase
-              .from("applications")
-              .select("status")
-              .eq("request_id", id)
-              .eq("applicant_id", user.id)
-              .maybeSingle()
+            .from("applications")
+            .select("status")
+            .eq("request_id", id)
+            .eq("applicant_id", user.id)
+            .maybeSingle()
           : Promise.resolve({ data: null }),
         user?.id === value.creator_id
           ? supabase
-              .from("applications")
-              .select(
-                "id, applicant_id, message, status, profile:applicant_id(*)",
-              )
-              .eq("request_id", id)
-              .order("created_at", { ascending: false })
+            .from("applications")
+            .select(
+              "id, applicant_id, message, status, profile:applicant_id(*)",
+            )
+            .eq("request_id", id)
+            .order("created_at", { ascending: false })
           : Promise.resolve({ data: [] }),
         user?.id === value.creator_id
           ? supabase
-              .from("connections")
-              .select("id, request_id, user1_id, user2_id")
-              .eq("request_id", id)
+            .from("connections")
+            .select("id, request_id, user1_id, user2_id")
+            .eq("request_id", id)
           : Promise.resolve({ data: [] }),
       ]);
 
@@ -364,6 +364,15 @@ export default function RequestDetailPage() {
   }
 
   const ownRequest = user?.id === request.creator_id;
+
+  // The creator and anyone who has applied can invite friends.
+  // Accepted applicants are included automatically.
+  const canShareRequest =
+    !!user &&
+    !!request &&
+    (user.id === request.creator_id ||
+      applicationStatus !== null);
+
   const unavailable =
     accepted >= request.members_needed || request.status !== "open";
   const canApply = Boolean(
@@ -385,9 +394,8 @@ export default function RequestDetailPage() {
           ← Back to {request.event?.name || "event"}
         </a>
         <article
-          className={`mt-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ${
-            unavailable ? "opacity-75" : ""
-          }`}
+          className={`mt-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ${unavailable ? "opacity-75" : ""
+            }`}
         >
           <p className="text-sm font-semibold text-indigo-600">
             {request.event?.name}
@@ -434,10 +442,14 @@ export default function RequestDetailPage() {
                 Sign in to request to join
               </button>
             )}
-            {ownRequest && (
+            {canShareRequest && (
               <div className="flex flex-wrap items-center gap-3">
                 <p className="text-sm font-medium text-slate-500">
-                  You created this request.
+                  {ownRequest
+                    ? "You created this request."
+                    : applicationStatus === "accepted"
+                      ? "You are a member of this team."
+                      : "You have applied to this request."}
                 </p>
 
                 <button
@@ -449,19 +461,18 @@ export default function RequestDetailPage() {
                   }}
                   className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-700 transition"
                 >
-                  Share Request
+                  Invite Friends
                 </button>
               </div>
             )}
             {applicationStatus && (
               <p
-                className={`text-sm font-semibold ${
-                  applicationStatus === "accepted"
+                className={`text-sm font-semibold ${applicationStatus === "accepted"
                     ? "text-emerald-700"
                     : applicationStatus === "rejected"
                       ? "text-red-700"
                       : "text-slate-600"
-                }`}
+                  }`}
               >
                 {applicationStatus === "accepted"
                   ? "You have been accepted into this team."
@@ -743,7 +754,7 @@ export default function RequestDetailPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900">
-                    Share Request
+                    Invite Friends
                   </h2>
 
                   <p className="mt-1 text-sm text-slate-500">
@@ -812,9 +823,8 @@ export default function RequestDetailPage() {
                         key={profile.id}
                         type="button"
                         onClick={() => toggleProfile(profile.id)}
-                        className={`flex w-full items-center justify-between border-b border-slate-100 px-4 py-3 text-left last:border-b-0 transition ${
-                          selected ? "bg-indigo-50" : "hover:bg-slate-50"
-                        }`}
+                        className={`flex w-full items-center justify-between border-b border-slate-100 px-4 py-3 text-left last:border-b-0 transition ${selected ? "bg-indigo-50" : "hover:bg-slate-50"
+                          }`}
                       >
                         <div>
                           <p className="text-sm font-semibold text-slate-900">
@@ -834,11 +844,10 @@ export default function RequestDetailPage() {
                         </div>
 
                         <div
-                          className={`flex h-5 w-5 items-center justify-center rounded border text-xs ${
-                            selected
+                          className={`flex h-5 w-5 items-center justify-center rounded border text-xs ${selected
                               ? "border-indigo-600 bg-indigo-600 text-white"
                               : "border-slate-300 bg-white"
-                          }`}
+                            }`}
                         >
                           {selected && "✓"}
                         </div>
