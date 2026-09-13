@@ -29,6 +29,7 @@ export default function ProfileFormPage() {
     interests: "",
     experience: "",
     achievements: "",
+    resume_path: "",
     github: "",
     linkedin: "",
     avatar_url: "",
@@ -92,6 +93,7 @@ export default function ProfileFormPage() {
             interests: formatFieldToString(p.interests),
             experience: p.experience || "",
             achievements: p.achievements || "",
+            resume_path: p.resume_path || "",
             github: p.github || "",
             linkedin: p.linkedin || "",
             avatar_url: p.avatar_url || user!.user_metadata?.avatar_url || "",
@@ -131,6 +133,55 @@ export default function ProfileFormPage() {
     setErrorMessage(null);
   };
 
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const {
+      data: { user: authenticatedUser },
+    } = await supabase.auth.getUser();
+    console.log("RESUME AUTH USER:", authenticatedUser?.id);
+    console.log("RESUME AUTH EMAIL:", authenticatedUser?.email);
+
+    if (!authenticatedUser) {
+      setErrorMessage("You must be logged in to upload a resume.");
+      return;
+    }
+    if (file.type !== "application/pdf") {
+      setErrorMessage("Please upload your resume as a PDF.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage("Resume must be smaller than 5 MB.");
+      return;
+    }
+
+    const filePath = `${authenticatedUser.id}/resume.pdf`;
+    console.log("RESUME PATH:", filePath);
+    setErrorMessage(null);
+    const { error: uploadError } = await supabase.storage
+      .from("resume")
+      .upload(filePath, file, {
+        upsert: true,
+        contentType: "application/pdf",
+      });
+
+    if (uploadError) {
+      console.error("Resume upload error:", {
+        message: uploadError.message,
+        name: uploadError.name,
+        cause: uploadError,
+      });
+      setErrorMessage(uploadError.message);
+      return;
+    }
+
+    setFormData((prev) => ({ ...prev, resume_path: filePath }));
+    setSuccessMessage(
+      "Resume uploaded successfully. Save your profile to keep it.",
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -160,6 +211,7 @@ export default function ProfileFormPage() {
       interests: formData.interests.trim() || null,
       experience: formData.experience.trim() || null,
       achievements: formData.achievements.trim() || null,
+      resume_path: formData.resume_path.trim() || null,
       github: formData.github.trim() || null,
       linkedin: formData.linkedin.trim() || null,
       avatar_url: formData.avatar_url.trim() || null,
@@ -472,6 +524,32 @@ export default function ProfileFormPage() {
                   className="w-full resize-none rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
                 />
               </div>
+            </div>
+          </section>
+
+          <div className="my-10 border-t border-slate-200" />
+
+          {/* Section: Resume */}
+          <section>
+            <h3 className="text-xl font-semibold text-slate-900">Resume</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Upload a PDF resume for teammates to view.
+            </p>
+            <div className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5">
+              <p className="text-sm font-medium text-slate-700">
+                {formData.resume_path
+                  ? "Resume uploaded"
+                  : "No resume uploaded"}
+              </p>
+              <label className="cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+                {formData.resume_path ? "Replace Resume" : "Upload Resume"}
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={handleResumeUpload}
+                />
+              </label>
             </div>
           </section>
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Profile } from "@/types/profile";
 import Navbar from "@/components/Navbar";
+import { createClient } from "@/lib/supabase/client";
 
 function parseArrayField(field: unknown): string[] {
   if (!field) return [];
@@ -50,6 +51,7 @@ export default function ProfileView({
   showBackButton = false,
 }: ProfileViewProps) {
   const router = useRouter();
+  const supabase = createClient();
 
   const displayName =
     profile.full_name || (isOwner ? userEmail : null) || "Student Profile";
@@ -60,6 +62,38 @@ export default function ProfileView({
 
   const skillsList = parseArrayField(profile.skills);
   const interestsList = parseArrayField(profile.interests);
+
+  const openResume = async () => {
+    if (!profile.resume_path) return;
+    const { data, error } = await supabase.storage
+      .from("resume")
+      .createSignedUrl(profile.resume_path, 300);
+    if (error) {
+      console.error("Resume signed URL error:", error);
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const removeResume = async () => {
+    if (!isOwner || !profile.resume_path) return;
+    const { error: storageError } = await supabase.storage
+      .from("resume")
+      .remove([profile.resume_path]);
+    if (storageError) {
+      console.error("Resume delete error:", storageError);
+      return;
+    }
+    const { error: profileError } = await supabase
+      .from("profile")
+      .update({ resume_path: null })
+      .eq("id", profile.id);
+    if (profileError) {
+      console.error("Resume profile update error:", profileError);
+      return;
+    }
+    window.location.reload();
+  };
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -201,6 +235,28 @@ export default function ProfileView({
               <p className="mt-2 leading-7 text-slate-600 whitespace-pre-line">
                 {profile.achievements}
               </p>
+            </section>
+          )}
+
+          {profile.resume_path && (
+            <section className="mt-8 border-t border-slate-200 pt-6">
+              <h3 className="text-lg font-semibold text-slate-900">Resume</h3>
+              <button
+                type="button"
+                onClick={openResume}
+                className="mt-3 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+              >
+                View Resume
+              </button>
+              {isOwner && (
+                <button
+                  type="button"
+                  onClick={removeResume}
+                  className="ml-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                >
+                  Remove Resume
+                </button>
+              )}
             </section>
           )}
 

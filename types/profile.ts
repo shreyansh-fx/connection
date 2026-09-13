@@ -10,6 +10,7 @@ export interface Profile {
   interests: string | string[] | null;
   experience: string | null;
   achievements: string | null;
+  resume_path: string | null;
   github: string | null;
   linkedin: string | null;
   avatar_url: string | null;
