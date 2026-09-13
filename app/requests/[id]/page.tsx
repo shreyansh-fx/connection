@@ -45,6 +45,14 @@ export default function RequestDetailPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [selectedProfiles, setSelectedProfiles] = useState<string[]>([]);
+  const [profileSearch, setProfileSearch] = useState("");
+  const [sharing, setSharing] = useState(false);
+  const [shareMessage, setShareMessage] = useState("");
+  const [copied, setCopied] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -69,20 +77,20 @@ export default function RequestDetailPage() {
         .eq("status", "accepted"),
       user
         ? supabase
-            .from("applications")
-            .select("status")
-            .eq("request_id", id)
-            .eq("applicant_id", user.id)
-            .maybeSingle()
+          .from("applications")
+          .select("status")
+          .eq("request_id", id)
+          .eq("applicant_id", user.id)
+          .maybeSingle()
         : Promise.resolve({ data: null }),
       user?.id === value.creator_id
         ? supabase
-            .from("applications")
-            .select(
-              "id, applicant_id, message, status, profile:applicant_id(*)",
-            )
-            .eq("request_id", id)
-            .order("created_at", { ascending: false })
+          .from("applications")
+          .select(
+            "id, applicant_id, message, status, profile:applicant_id(*)",
+          )
+          .eq("request_id", id)
+          .order("created_at", { ascending: false })
         : Promise.resolve({ data: [] }),
     ]);
 
@@ -100,6 +108,84 @@ export default function RequestDetailPage() {
     );
     setLoading(false);
   }, [id, supabase, user]);
+
+  const loadProfilesForSharing = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("profile")
+      .select("id, full_name, branch, year")
+      .neq("id", user.id)
+      .order("full_name");
+
+    if (error) {
+      console.error("Error loading profiles:", error);
+      setShareMessage("Could not load profiles.");
+      return;
+    }
+
+    setProfiles((data ?? []) as Profile[]);
+  };
+
+  const filteredProfiles = profiles.filter((profile) =>
+    (profile.full_name ?? "")
+      .toLowerCase()
+      .includes(profileSearch.toLowerCase())
+  );
+
+  const toggleProfile = (profileId: string) => {
+    setSelectedProfiles((current) =>
+      current.includes(profileId)
+        ? current.filter((id) => id !== profileId)
+        : [...current, profileId]
+    );
+  };
+
+  const copyRequestLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to copy link:", error);
+      setShareMessage("Could not copy the link.");
+    }
+  };
+
+  const sendInvitations = async () => {
+    if (!request || selectedProfiles.length === 0) {
+      setShareMessage("Select at least one person.");
+      return;
+    }
+
+    setSharing(true);
+    setShareMessage("");
+
+    const { error } = await supabase.rpc("send_request_invites", {
+      p_request_id: request.id,
+      p_user_ids: selectedProfiles,
+    });
+
+    if (error) {
+      console.error("Error sending invitations:", error);
+      setShareMessage(error.message || "Failed to send invitations.");
+      setSharing(false);
+      return;
+    }
+
+    setShareMessage("Invitations sent successfully!");
+    setSelectedProfiles([]);
+    setProfileSearch("");
+    setSharing(false);
+
+    setTimeout(() => {
+      setShowShareModal(false);
+      setShareMessage("");
+    }, 1200);
+  };
 
   useEffect(() => {
     load();
@@ -225,9 +311,8 @@ export default function RequestDetailPage() {
           ← Back to {request.event?.name || "event"}
         </a>
         <article
-          className={`mt-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ${
-            unavailable ? "opacity-75" : ""
-          }`}
+          className={`mt-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ${unavailable ? "opacity-75" : ""
+            }`}
         >
           <p className="text-sm font-semibold text-indigo-600">
             {request.event?.name}
@@ -275,19 +360,32 @@ export default function RequestDetailPage() {
               </button>
             )}
             {ownRequest && (
-              <p className="text-sm font-medium text-slate-500">
-                You created this request.
-              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-sm font-medium text-slate-500">
+                  You created this request.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowShareModal(true);
+                    setShareMessage("");
+                    loadProfilesForSharing();
+                  }}
+                  className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-700 transition"
+                >
+                  Share Request
+                </button>
+              </div>
             )}
             {applicationStatus && (
               <p
-                className={`text-sm font-semibold ${
-                  applicationStatus === "accepted"
+                className={`text-sm font-semibold ${applicationStatus === "accepted"
                     ? "text-emerald-700"
                     : applicationStatus === "rejected"
                       ? "text-red-700"
                       : "text-slate-600"
-                }`}
+                  }`}
               >
                 {applicationStatus === "accepted"
                   ? "You have been accepted into this team."
@@ -409,11 +507,10 @@ export default function RequestDetailPage() {
                                 </Link>
                               )}
                               <span
-                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                  application.status === "accepted"
+                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${application.status === "accepted"
                                     ? "bg-emerald-50 text-emerald-700"
                                     : "bg-amber-50 text-amber-700"
-                                }`}
+                                  }`}
                               >
                                 {application.status}
                               </span>
@@ -532,6 +629,153 @@ export default function RequestDetailPage() {
             </p>
           )}
         </section>
+
+        {/* Share Request Modal */}
+        {showShareModal && (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
+            <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">
+                    Share Request
+                  </h2>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Invite people to view this collaboration request.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowShareModal(false);
+                    setSelectedProfiles([]);
+                    setProfileSearch("");
+                    setShareMessage("");
+                  }}
+                  className="text-slate-500 hover:text-slate-800"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Copy Link */}
+              <div className="mt-6">
+                <p className="mb-2 text-sm font-semibold text-slate-900">
+                  Copy Request Link
+                </p>
+
+                <button
+                  type="button"
+                  onClick={copyRequestLink}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+                >
+                  {copied ? "✓ Link copied!" : "Copy Request Link"}
+                </button>
+              </div>
+
+              <div className="my-6 border-t border-slate-200" />
+
+              {/* Profile Search */}
+              <div>
+                <p className="mb-2 text-sm font-semibold text-slate-900">
+                  Share with Campus Collab Profiles
+                </p>
+
+                <input
+                  type="text"
+                  value={profileSearch}
+                  onChange={(e) => setProfileSearch(e.target.value)}
+                  placeholder="Search profiles..."
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                />
+              </div>
+
+              {/* Profiles */}
+              <div className="mt-3 max-h-56 overflow-y-auto rounded-xl border border-slate-200">
+                {filteredProfiles.length === 0 ? (
+                  <p className="p-4 text-sm text-slate-500">
+                    No profiles found.
+                  </p>
+                ) : (
+                  filteredProfiles.map((profile) => {
+                    const selected = selectedProfiles.includes(profile.id);
+
+                    return (
+                      <button
+                        key={profile.id}
+                        type="button"
+                        onClick={() => toggleProfile(profile.id)}
+                        className={`flex w-full items-center justify-between border-b border-slate-100 px-4 py-3 text-left last:border-b-0 transition ${selected ? "bg-indigo-50" : "hover:bg-slate-50"
+                          }`}
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {profile.full_name || "Campus student"}
+                          </p>
+
+                          <p className="text-xs text-slate-500">
+                            {profile.branch || "Branch not specified"}
+                            {profile.year ? ` • ${profile.year}` : ""}
+                          </p>
+                        </div>
+
+                        <div
+                          className={`flex h-5 w-5 items-center justify-center rounded border text-xs ${selected
+                              ? "border-indigo-600 bg-indigo-600 text-white"
+                              : "border-slate-300 bg-white"
+                            }`}
+                        >
+                          {selected && "✓"}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Selected count */}
+              {selectedProfiles.length > 0 && (
+                <p className="mt-3 text-sm font-medium text-slate-600">
+                  {selectedProfiles.length}{" "}
+                  {selectedProfiles.length === 1 ? "person" : "people"} selected
+                </p>
+              )}
+
+              {/* Message */}
+              {shareMessage && (
+                <p className="mt-3 rounded-lg bg-indigo-50 px-4 py-3 text-sm font-medium text-indigo-700">
+                  {shareMessage}
+                </p>
+              )}
+
+              {/* Actions */}
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowShareModal(false);
+                    setSelectedProfiles([]);
+                    setProfileSearch("");
+                    setShareMessage("");
+                  }}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  disabled={sharing || selectedProfiles.length === 0}
+                  onClick={sendInvitations}
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 transition"
+                >
+                  {sharing ? "Sending..." : "Send Invitations"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Join Application Modal */}
         {showForm && (
