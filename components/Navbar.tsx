@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { createClient } from "@/lib/supabase/client";
 
@@ -34,6 +34,7 @@ function formatRelativeTime(timestamp: string) {
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, loading, signOut } = useAuth();
   const supabase = useMemo(() => createClient(), []);
   const notificationRef = useRef<HTMLDivElement | null>(null);
@@ -208,6 +209,34 @@ export default function Navbar() {
     setUnreadCount((previous) => Math.max(previous - 1, 0));
   };
 
+  const handleNotificationClick = async (notification: NotificationItem) => {
+    setIsNotificationOpen(false);
+
+    if (!notification.is_read) {
+      await markNotificationAsRead(notification);
+    }
+
+    if (!notification.related_id) {
+      return;
+    }
+
+    const { data: application, error } = await supabase
+      .from("applications")
+      .select("request_id")
+      .eq("id", notification.related_id)
+      .single();
+
+    if (error || !application?.request_id) {
+      console.error(
+        "[NAVBAR] Failed to resolve notification request route:",
+        error?.message ?? "Missing request_id",
+      );
+      return;
+    }
+
+    router.push(`/requests/${application.request_id}`);
+  };
+
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
@@ -291,8 +320,10 @@ export default function Navbar() {
                           <button
                             key={notification.id}
                             type="button"
-                            onClick={() => markNotificationAsRead(notification)}
-                            className={`w-full rounded-xl border p-3 text-left transition ${
+                            onClick={() => {
+                              void handleNotificationClick(notification);
+                            }}
+                            className={`w-full cursor-pointer rounded-xl border p-3 text-left transition hover:border-indigo-200 hover:bg-indigo-50/40 ${
                               notification.is_read
                                 ? "border-slate-200 bg-slate-50"
                                 : "border-indigo-100 bg-indigo-50/60"

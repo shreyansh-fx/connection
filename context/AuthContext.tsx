@@ -20,25 +20,83 @@ const AuthContext = createContext<AuthContextType>({
   signInWithGoogle: async () => {},
 });
 
+const isAllowedCollegeEmail = (email?: string | null) => {
+  const normalized = email?.toLowerCase() ?? "";
+  return normalized.endsWith("@iiitdmj.ac.in");
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
+  const rejectInvalidDomainUser = async (email?: string | null) => {
+    if (isAllowedCollegeEmail(email)) {
+      return false;
+    }
+
+    console.warn(
+      "[AUTH] Invalid email domain for Google login:",
+      email ?? "unknown",
+    );
+
+    try {
+      await supabase.auth.signOut({ scope: "global" });
+    } catch (error) {
+      console.error("[AUTH] Failed to sign out invalid Google user:", error);
+    }
+
+    try {
+      await fetch("/api/auth/signout", { method: "POST" });
+    } catch (error) {
+      console.error("[AUTH] Failed to clear invalid session cookies:", error);
+    }
+
+    if (typeof document !== "undefined") {
+      document.cookie.split(";").forEach((cookie) => {
+        const name = cookie.split("=")[0].trim();
+        if (name.startsWith("sb-")) {
+          document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0`;
+        }
+      });
+    }
+
+    setSession(null);
+    setUser(null);
+    setLoading(false);
+
+    if (typeof window !== "undefined") {
+      window.alert("Please use your IIITDMJ college account (@iiitdmj.ac.in).");
+      window.location.href = "/login";
+    }
+
+    return true;
+  };
+
   useEffect(() => {
     console.log("[AUTH] Checking initial session on startup...");
 
     supabase.auth
       .getSession()
-      .then(({ data: { session: initialSession }, error }) => {
+      .then(async ({ data: { session: initialSession }, error }) => {
         if (error) {
           console.error("[AUTH] Error getting initial session:", error.message);
         }
         console.log(
           "[AUTH] Current session on app startup:",
-          initialSession ? initialSession.user.email : "No session"
+          initialSession ? initialSession.user.email : "No session",
         );
+
+        if (initialSession) {
+          const rejected = await rejectInvalidDomainUser(
+            initialSession.user.email,
+          );
+          if (rejected) {
+            return;
+          }
+        }
+
         setSession(initialSession);
         setUser(initialSession?.user ?? null);
         setLoading(false);
@@ -57,19 +115,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (event === "SIGNED_IN") {
         console.log("[AUTH] SIGNED_IN:", newSession?.user?.email);
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
-        setLoading(false);
-      } else if (event === "SIGNED_OUT") {
+        void rejectInvalidDomainUser(newSession?.user?.email).then(
+          (rejected) => {
+            if (rejected) {
+              return;
+            }
+            setSession(newSession);
+            setUser(newSession?.user ?? null);
+            setLoading(false);
+          },
+        );
+        return;
+      }
+
+      if (event === "SIGNED_OUT") {
         console.log("[AUTH] SIGNED_OUT event received");
         setSession(null);
         setUser(null);
         setLoading(false);
-      } else {
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
-        setLoading(false);
+        return;
       }
+
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
+      setLoading(false);
     });
 
     return () => {
@@ -125,7 +194,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 4. Clear React state
     setSession(null);
     setUser(null);
-    console.log("[AUTH] SIGNED_OUT: Local state reset. Hard redirecting to /login");
+    console.log(
+      "[AUTH] SIGNED_OUT: Local state reset. Hard redirecting to /login",
+    );
 
     // 5. Full page navigation to /login to ensure clean state
     window.location.href = "/login";
