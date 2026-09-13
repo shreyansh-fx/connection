@@ -69,7 +69,7 @@ export default function Navbar() {
           {loading ? null : user ? (
             <>
               <a
-                href="/profile/view"
+                href="/profile"
                 className="flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-indigo-300 hover:text-indigo-600"
               >
                 {user.user_metadata?.avatar_url ? (

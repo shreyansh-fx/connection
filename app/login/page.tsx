@@ -1,20 +1,49 @@
 "use client";
-import Link from "next/link";
-import { useAuth } from "@/context/AuthContext";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
+import { createClient } from "@/lib/supabase/client";
+import { fetchUserProfile } from "@/lib/supabase/profile";
 
 export default function LoginPage() {
   const router = useRouter();
+  const supabase = createClient();
   const { user, loading: authLoading, signInWithGoogle } = useAuth();
   const [submitting, setSubmitting] = useState(false);
+  const [checkingProfile, setCheckingProfile] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && user) {
-      console.log("[LOGIN PAGE] User already authenticated, redirecting to /profile:", user.email);
-      router.push("/profile");
+    if (authLoading || !user) return;
+
+    let isMounted = true;
+    async function checkProfileAndRedirect() {
+      setCheckingProfile(true);
+      console.log("[LOGIN PAGE] Checking profile existence for authenticated user:", user!.id);
+      const { profile, error } = await fetchUserProfile(supabase, user!.id);
+
+      if (!isMounted) return;
+
+      if (error) {
+        console.error("[LOGIN PAGE] Profile query error:", error);
+        // Do NOT assume no profile on database error. Redirect to /profile to handle state
+        router.push("/profile");
+      } else if (profile) {
+        console.log("[LOGIN PAGE] Existing profile found. Redirecting to /profile");
+        router.push("/profile");
+      } else {
+        console.log("[LOGIN PAGE] No profile found. Redirecting to /profile/view (Make Profile)");
+        router.push("/profile/view");
+      }
     }
-  }, [user, authLoading, router]);
+
+    checkProfileAndRedirect();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user, authLoading, router, supabase]);
 
   async function handleGoogleLogin() {
     setSubmitting(true);
@@ -26,7 +55,7 @@ export default function LoginPage() {
     }
   }
 
-  const isButtonDisabled = authLoading || submitting;
+  const isButtonDisabled = authLoading || submitting || checkingProfile;
 
   return (
     <div className="min-h-screen bg-surface text-on-surface flex flex-col">

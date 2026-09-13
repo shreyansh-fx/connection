@@ -2,16 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { fetchUserProfile, saveUserProfile } from "@/lib/supabase/profile";
 import { Profile } from "@/types/profile";
 import { useAuth } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
 
-export default function ProfilePage() {
+export default function ProfileFormPage() {
   const router = useRouter();
   const supabase = createClient();
   const { user, loading: authLoading } = useAuth();
   const [profileLoading, setProfileLoading] = useState(true);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -34,29 +37,29 @@ export default function ProfilePage() {
   useEffect(() => {
     // If auth is done loading and there is no user, redirect to /login
     if (!authLoading && !user) {
-      console.log("[PROFILE] No active session found, redirecting to /login");
+      console.log("[PROFILE FORM] No active session found, redirecting to /login");
       router.push("/login");
       return;
     }
 
     // If user is loaded, fetch their profile from Supabase
     if (user) {
+      let isMounted = true;
       async function loadProfile() {
         setProfileLoading(true);
-        console.log("[PROFILE] Fetching profile from Supabase for user:", user!.id);
-        const { data: profileData, error: profileError } = await supabase
-          .from("profile")
-          .select("*")
-          .eq("id", user!.id)
-          .maybeSingle();
+        console.log("[PROFILE FORM] Fetching profile from Supabase for user:", user!.id);
+        const { profile: profileData, error: profileError } = await fetchUserProfile(supabase, user!.id);
+
+        if (!isMounted) return;
 
         if (profileError) {
-          console.error("[PROFILE] Error fetching profile:", profileError.message || profileError);
+          console.error("[PROFILE FORM] Error fetching profile:", profileError.message || profileError);
           setErrorMessage(
             `Failed to load profile from Supabase: ${profileError.message || JSON.stringify(profileError)}`
           );
         } else if (profileData) {
-          const p = profileData as Profile;
+          setIsEditMode(true);
+          const p = profileData;
           const formatFieldToString = (val: unknown) => {
             if (!val) return "";
             if (typeof val === "string") return val;
@@ -80,6 +83,7 @@ export default function ProfilePage() {
               p.avatar_url || user!.user_metadata?.avatar_url || "",
           });
         } else {
+          setIsEditMode(false);
           // Pre-fill default details from Google Auth metadata if available
           setFormData((prev) => ({
             ...prev,
@@ -95,8 +99,12 @@ export default function ProfilePage() {
       }
 
       loadProfile();
+
+      return () => {
+        isMounted = false;
+      };
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, supabase]);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -146,16 +154,14 @@ export default function ProfilePage() {
       updated_at: new Date().toISOString(),
     };
 
-    console.log("[PROFILE] Upserting profile to Supabase with ID:", user.id);
-    const { error } = await supabase
-      .from("profile")
-      .upsert(payload, { onConflict: "id" });
+    console.log("[PROFILE FORM] Saving profile to Supabase with ID:", user.id);
+    const { error } = await saveUserProfile(supabase, payload);
 
     setSaving(false);
 
     if (error) {
       const errMsg = error.message || error.details || error.hint || JSON.stringify(error);
-      console.error("[PROFILE] Profile save error:", {
+      console.error("[PROFILE FORM] Profile save error:", {
         message: error.message,
         details: error.details,
         hint: error.hint,
@@ -170,7 +176,9 @@ export default function ProfilePage() {
         setErrorMessage(`Save failed: ${errMsg}`);
       }
     } else {
-      setSuccessMessage("✓ Profile saved successfully to Supabase!");
+      console.log("[PROFILE FORM] Profile saved successfully. Redirecting to /profile");
+      setSuccessMessage("✓ Profile saved successfully!");
+      router.push("/profile");
     }
   };
 
@@ -195,13 +203,15 @@ export default function ProfilePage() {
         {/* Page Heading */}
         <div className="mb-8">
           <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-indigo-600">
-            Your Profile
+            {isEditMode ? "Edit Profile" : "Make Profile"}
           </p>
           <h2 className="text-4xl font-bold tracking-tight text-slate-900">
-            Tell us about yourself
+            {isEditMode ? "Update your details" : "Tell us about yourself"}
           </h2>
           <p className="mt-3 text-slate-500">
-            Your profile helps Campus Collab match you with relevant teammates and opportunities across campus.
+            {isEditMode
+              ? "Update your profile information for teams and opportunities across campus."
+              : "Your profile helps Campus Collab match you with relevant teammates and opportunities across campus."}
           </p>
         </div>
 
@@ -490,7 +500,7 @@ export default function ProfilePage() {
           <div className="mt-10 flex items-center justify-between border-t border-slate-200 pt-6">
             <button
               type="button"
-              onClick={() => router.push("/profile/view")}
+              onClick={() => router.push("/profile")}
               className="rounded-lg border border-slate-300 px-5 py-2.5 font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer"
             >
               View Profile

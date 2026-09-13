@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { fetchUserProfile } from "@/lib/supabase/profile";
 import { Profile } from "@/types/profile";
 import { useAuth } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
@@ -33,6 +35,7 @@ export default function ProfileViewPage() {
   const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -42,27 +45,36 @@ export default function ProfileViewPage() {
     }
 
     if (user) {
+      let isMounted = true;
       async function loadProfile() {
         setProfileLoading(true);
+        setFetchError(null);
         console.log("[PROFILE VIEW] Loading profile for user:", user!.id);
-        const { data: profileData, error: profileError } = await supabase
-          .from("profile")
-          .select("*")
-          .eq("id", user!.id)
-          .maybeSingle();
+        const { profile: profileData, error: profileError } = await fetchUserProfile(supabase, user!.id);
+
+        if (!isMounted) return;
 
         if (profileError) {
           console.error("[PROFILE VIEW] Error fetching profile view:", profileError.message || profileError);
+          setFetchError(profileError.message || "Failed to load profile details");
         } else if (profileData) {
-          setProfile(profileData as Profile);
+          setProfile(profileData);
+        } else {
+          console.log("[PROFILE VIEW] No profile row found. Redirecting to /profile/view (Make Profile)...");
+          router.push("/profile/view");
+          return;
         }
 
         setProfileLoading(false);
       }
 
       loadProfile();
+
+      return () => {
+        isMounted = false;
+      };
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, supabase]);
 
   if (authLoading || (user && profileLoading)) {
     return (
@@ -129,13 +141,19 @@ export default function ProfileViewPage() {
               </div>
             </div>
 
-            <a
-              href="/profile"
+            <Link
+              href="/profile/view"
               className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 font-semibold text-white transition hover:bg-indigo-700 text-sm"
             >
               Edit Profile
-            </a>
+            </Link>
           </div>
+
+          {fetchError && (
+            <div className="mt-6 rounded-lg bg-red-50 p-4 border border-red-200 text-sm text-red-700 font-medium">
+              Error: {fetchError}
+            </div>
+          )}
 
           {/* Bio / About */}
           {profile?.bio && (

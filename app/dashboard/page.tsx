@@ -30,13 +30,13 @@ export default async function Dashboard() {
               href="/profile"
               className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition"
             >
-              Edit Profile
+              View Profile
             </a>
             <a
               href="/profile/view"
               className="rounded-lg border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
             >
-              View Profile
+              Edit Profile
             </a>
           </div>
         </div>
