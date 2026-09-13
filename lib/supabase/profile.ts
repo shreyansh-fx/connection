@@ -3,7 +3,7 @@ import { Profile } from "@/types/profile";
 
 export async function fetchUserProfile(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
 ): Promise<{ profile: Profile | null; error: any }> {
   try {
     let { data, error } = await supabase
@@ -12,7 +12,10 @@ export async function fetchUserProfile(
       .eq("id", userId)
       .maybeSingle();
 
-    if (error && (error.code === "42P01" || error.message?.includes("relation"))) {
+    if (
+      error &&
+      (error.code === "42P01" || error.message?.includes("relation"))
+    ) {
       const fallback = await supabase
         .from("profiles")
         .select("*")
@@ -38,19 +41,23 @@ export async function fetchUserProfile(
 
 export async function saveUserProfile(
   supabase: SupabaseClient,
-  payload: Partial<Profile> & { id: string }
+  payload: Omit<Partial<Profile>, "email"> & { id: string },
+  email: string | null | undefined,
 ): Promise<{ data: any; error: any }> {
   try {
     let { data, error } = await supabase
       .from("profile")
-      .upsert(payload, { onConflict: "id" })
+      .upsert({ ...payload, email: email || null }, { onConflict: "id" })
       .select()
       .maybeSingle();
 
-    if (error && (error.code === "42P01" || error.message?.includes("relation"))) {
+    if (
+      error &&
+      (error.code === "42P01" || error.message?.includes("relation"))
+    ) {
       const fallback = await supabase
         .from("profiles")
-        .upsert(payload, { onConflict: "id" })
+        .upsert({ ...payload, email: email || null }, { onConflict: "id" })
         .select()
         .maybeSingle();
       data = fallback.data;

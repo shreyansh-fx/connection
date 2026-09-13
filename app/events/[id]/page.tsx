@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type Profile = {
   full_name: string | null;
+  email: string | null;
   gender: string | null;
   branch: string | null;
   year: string | null;
@@ -48,7 +49,7 @@ export default function EventDetailPage() {
       supabase.from("events").select("*").eq("id", id).single(),
       supabase
         .from("requests")
-        .select("*, profile:creator_id(full_name, gender, branch, year)")
+        .select("*, profile:creator_id(full_name, email, gender, branch, year)")
         .eq("event_id", id)
         .order("created_at", { ascending: false }),
     ]);
@@ -181,6 +182,11 @@ export default function EventDetailPage() {
                     <p className="text-sm font-semibold text-slate-800">
                       {request.profile?.full_name || "Campus student"}
                     </p>
+                    {request.profile?.email && (
+                      <p className="text-xs text-slate-500">
+                        {request.profile.email}
+                      </p>
+                    )}
                     <p className="text-xs text-slate-500">
                       {[
                         request.profile?.branch,

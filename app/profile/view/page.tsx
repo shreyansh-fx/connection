@@ -69,6 +69,12 @@ export default function ProfileFormPage() {
         } else if (profileData) {
           setIsEditMode(true);
           const p = profileData;
+          if (!p.email && user!.email) {
+            await supabase
+              .from("profile")
+              .update({ email: user!.email })
+              .eq("id", user!.id);
+          }
           const formatFieldToString = (val: unknown) => {
             if (!val) return "";
             if (typeof val === "string") return val;
@@ -161,7 +167,7 @@ export default function ProfileFormPage() {
     };
 
     console.log("[PROFILE FORM] Saving profile to Supabase with ID:", user.id);
-    const { error } = await saveUserProfile(supabase, payload);
+    const { error } = await saveUserProfile(supabase, payload, user.email);
 
     setSaving(false);
 
@@ -285,6 +291,18 @@ export default function ProfileFormPage() {
                   required
                   className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-slate-900"
                 />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-slate-700">
+                  Email
+                </label>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-slate-600">
+                  {user?.email || "No email available"}
+                </div>
+                <p className="mt-2 text-xs text-slate-400">
+                  Email is linked to your Google account.
+                </p>
               </div>
 
               {/* Gender */}

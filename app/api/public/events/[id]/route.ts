@@ -19,6 +19,7 @@ export async function GET(
         profile:creator_id (
           id,
           full_name,
+          email,
           gender,
           branch,
           year,

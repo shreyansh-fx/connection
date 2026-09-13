@@ -99,13 +99,15 @@ export default function ProfileView({
                 <h2 className="mt-1 text-3xl font-bold text-slate-900">
                   {displayName}
                 </h2>
+                {(profile.email || (isOwner && userEmail)) && (
+                  <p className="mt-1 text-sm text-slate-500">
+                    {profile.email || userEmail}
+                  </p>
+                )}
                 {displaySubtitle && (
                   <p className="mt-1 text-sm text-slate-500 font-medium">
                     {displaySubtitle}
                   </p>
-                )}
-                {isOwner && userEmail && (
-                  <p className="mt-0.5 text-xs text-slate-400">{userEmail}</p>
                 )}
               </div>
             </div>

@@ -27,6 +27,7 @@ type Application = {
   message: string | null;
   status: string;
   profile: Profile | null;
+  connection_id?: string | null;
 };
 
 export default function RequestDetailPage() {
@@ -69,42 +70,62 @@ export default function RequestDetailPage() {
     const value = data as CollaborationRequest;
     setRequest(value);
 
-    const [acceptedResult, ownResult, applicantResult] = await Promise.all([
-      supabase
-        .from("applications")
-        .select("*", { count: "exact", head: true })
-        .eq("request_id", id)
-        .eq("status", "accepted"),
-      user
-        ? supabase
+    const [acceptedResult, ownResult, applicantResult, connectionsResult] =
+      await Promise.all([
+        supabase
           .from("applications")
-          .select("status")
+          .select("*", { count: "exact", head: true })
           .eq("request_id", id)
-          .eq("applicant_id", user.id)
-          .maybeSingle()
-        : Promise.resolve({ data: null }),
-      user?.id === value.creator_id
-        ? supabase
-          .from("applications")
-          .select(
-            "id, applicant_id, message, status, profile:applicant_id(*)",
-          )
-          .eq("request_id", id)
-          .order("created_at", { ascending: false })
-        : Promise.resolve({ data: [] }),
-    ]);
+          .eq("status", "accepted"),
+        user
+          ? supabase
+              .from("applications")
+              .select("status")
+              .eq("request_id", id)
+              .eq("applicant_id", user.id)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+        user?.id === value.creator_id
+          ? supabase
+              .from("applications")
+              .select(
+                "id, applicant_id, message, status, profile:applicant_id(*)",
+              )
+              .eq("request_id", id)
+              .order("created_at", { ascending: false })
+          : Promise.resolve({ data: [] }),
+        user?.id === value.creator_id
+          ? supabase
+              .from("connections")
+              .select("id, request_id, user1_id, user2_id")
+              .eq("request_id", id)
+          : Promise.resolve({ data: [] }),
+      ]);
 
     setAccepted(acceptedResult.count ?? 0);
     setApplicationStatus(
       (ownResult.data as { status: string } | null)?.status ?? null,
     );
+    const connectionRows = connectionsResult.data ?? [];
     setApplications(
-      (applicantResult.data ?? []).map((application) => ({
-        ...application,
-        profile: Array.isArray(application.profile)
+      (applicantResult.data ?? []).map((application) => {
+        const normalizedProfile = Array.isArray(application.profile)
           ? (application.profile[0] ?? null)
-          : application.profile,
-      })) as Application[],
+          : application.profile;
+        const connection = connectionRows.find(
+          (row) =>
+            row.request_id === id &&
+            ((row.user1_id === value.creator_id &&
+              row.user2_id === application.applicant_id) ||
+              (row.user2_id === value.creator_id &&
+                row.user1_id === application.applicant_id)),
+        );
+        return {
+          ...application,
+          profile: normalizedProfile,
+          connection_id: connection?.id ?? null,
+        };
+      }) as Application[],
     );
     setLoading(false);
   }, [id, supabase, user]);
@@ -114,7 +135,7 @@ export default function RequestDetailPage() {
 
     const { data, error } = await supabase
       .from("profile")
-      .select("id, full_name, branch, year")
+      .select("id, full_name, email, branch, year")
       .neq("id", user.id)
       .order("full_name");
 
@@ -130,14 +151,14 @@ export default function RequestDetailPage() {
   const filteredProfiles = profiles.filter((profile) =>
     (profile.full_name ?? "")
       .toLowerCase()
-      .includes(profileSearch.toLowerCase())
+      .includes(profileSearch.toLowerCase()),
   );
 
   const toggleProfile = (profileId: string) => {
     setSelectedProfiles((current) =>
       current.includes(profileId)
         ? current.filter((id) => id !== profileId)
-        : [...current, profileId]
+        : [...current, profileId],
     );
   };
 
@@ -238,6 +259,34 @@ export default function RequestDetailPage() {
       return;
     }
 
+    const { data: existingConnection, error: lookupError } = await supabase
+      .from("connections")
+      .select("id")
+      .eq("request_id", id)
+      .or(
+        `and(user1_id.eq.${request.creator_id},user2_id.eq.${application.applicant_id}),and(user1_id.eq.${application.applicant_id},user2_id.eq.${request.creator_id})`,
+      )
+      .maybeSingle();
+    if (lookupError) {
+      setSaving(false);
+      setMessage(lookupError.message);
+      return;
+    }
+    if (!existingConnection) {
+      const { error: connectionError } = await supabase
+        .from("connections")
+        .insert({
+          request_id: id,
+          user1_id: request.creator_id,
+          user2_id: application.applicant_id,
+        });
+      if (connectionError && connectionError.code !== "23505") {
+        setSaving(false);
+        setMessage(connectionError.message);
+        return;
+      }
+    }
+
     if (accepted + 1 >= request.members_needed) {
       const { error: requestError } = await supabase
         .from("requests")
@@ -268,6 +317,31 @@ export default function RequestDetailPage() {
       );
     }
     setSaving(false);
+    await load();
+  }
+
+  async function rejectApplicant(application: Application) {
+    if (
+      !window.confirm(
+        `Reject ${application.profile?.full_name || "this applicant"}?`,
+      )
+    ) {
+      return;
+    }
+    setSaving(true);
+    setMessage("");
+    const { error } = await supabase
+      .from("applications")
+      .update({ status: "rejected" })
+      .eq("id", application.id)
+      .eq("request_id", id)
+      .eq("status", "pending");
+    setSaving(false);
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    setMessage("Applicant rejected.");
     await load();
   }
 
@@ -311,8 +385,9 @@ export default function RequestDetailPage() {
           ← Back to {request.event?.name || "event"}
         </a>
         <article
-          className={`mt-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ${unavailable ? "opacity-75" : ""
-            }`}
+          className={`mt-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ${
+            unavailable ? "opacity-75" : ""
+          }`}
         >
           <p className="text-sm font-semibold text-indigo-600">
             {request.event?.name}
@@ -380,12 +455,13 @@ export default function RequestDetailPage() {
             )}
             {applicationStatus && (
               <p
-                className={`text-sm font-semibold ${applicationStatus === "accepted"
+                className={`text-sm font-semibold ${
+                  applicationStatus === "accepted"
                     ? "text-emerald-700"
                     : applicationStatus === "rejected"
                       ? "text-red-700"
                       : "text-slate-600"
-                  }`}
+                }`}
               >
                 {applicationStatus === "accepted"
                   ? "You have been accepted into this team."
@@ -486,6 +562,11 @@ export default function RequestDetailPage() {
                                     "Campus student"}
                                 </h3>
                               )}
+                              {application.profile?.email && (
+                                <p className="text-xs text-slate-500">
+                                  {application.profile.email}
+                                </p>
+                              )}
                               <p className="text-xs text-slate-500">
                                 {[
                                   application.profile?.branch,
@@ -497,7 +578,7 @@ export default function RequestDetailPage() {
                               </p>
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               {applicantUserId && (
                                 <Link
                                   href={profileLink}
@@ -506,11 +587,22 @@ export default function RequestDetailPage() {
                                   View Profile →
                                 </Link>
                               )}
+                              {application.status === "accepted" &&
+                                application.connection_id && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      router.push(
+                                        `/chat/${application.connection_id}`,
+                                      )
+                                    }
+                                    className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-700"
+                                  >
+                                    Chat
+                                  </button>
+                                )}
                               <span
-                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${application.status === "accepted"
-                                    ? "bg-emerald-50 text-emerald-700"
-                                    : "bg-amber-50 text-amber-700"
-                                  }`}
+                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${application.status === "accepted" ? "bg-emerald-50 text-emerald-700" : application.status === "rejected" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}
                               >
                                 {application.status}
                               </span>
@@ -535,13 +627,22 @@ export default function RequestDetailPage() {
                           )}
 
                           {application.status === "pending" && !unavailable && (
-                            <button
-                              onClick={() => acceptApplicant(application)}
-                              disabled={saving}
-                              className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer transition"
-                            >
-                              Accept applicant
-                            </button>
+                            <div className="mt-4 flex gap-2">
+                              <button
+                                onClick={() => acceptApplicant(application)}
+                                disabled={saving}
+                                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer transition"
+                              >
+                                Accept applicant
+                              </button>
+                              <button
+                                onClick={() => rejectApplicant(application)}
+                                disabled={saving}
+                                className="rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                              >
+                                Reject
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -601,6 +702,11 @@ export default function RequestDetailPage() {
                   <h3 className="font-bold text-slate-900 text-lg">
                     {request.profile?.full_name || "Campus student"}
                   </h3>
+                )}
+                {request.profile?.email && (
+                  <p className="text-sm text-slate-500">
+                    {request.profile.email}
+                  </p>
                 )}
                 <p className="text-sm text-slate-600">
                   {[
@@ -706,13 +812,20 @@ export default function RequestDetailPage() {
                         key={profile.id}
                         type="button"
                         onClick={() => toggleProfile(profile.id)}
-                        className={`flex w-full items-center justify-between border-b border-slate-100 px-4 py-3 text-left last:border-b-0 transition ${selected ? "bg-indigo-50" : "hover:bg-slate-50"
-                          }`}
+                        className={`flex w-full items-center justify-between border-b border-slate-100 px-4 py-3 text-left last:border-b-0 transition ${
+                          selected ? "bg-indigo-50" : "hover:bg-slate-50"
+                        }`}
                       >
                         <div>
                           <p className="text-sm font-semibold text-slate-900">
                             {profile.full_name || "Campus student"}
                           </p>
+
+                          {profile.email && (
+                            <p className="text-xs text-slate-500">
+                              {profile.email}
+                            </p>
+                          )}
 
                           <p className="text-xs text-slate-500">
                             {profile.branch || "Branch not specified"}
@@ -721,10 +834,11 @@ export default function RequestDetailPage() {
                         </div>
 
                         <div
-                          className={`flex h-5 w-5 items-center justify-center rounded border text-xs ${selected
+                          className={`flex h-5 w-5 items-center justify-center rounded border text-xs ${
+                            selected
                               ? "border-indigo-600 bg-indigo-600 text-white"
                               : "border-slate-300 bg-white"
-                            }`}
+                          }`}
                         >
                           {selected && "✓"}
                         </div>
