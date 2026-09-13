@@ -37,7 +37,9 @@ export default function RequestDetailPage() {
   const [request, setRequest] = useState<CollaborationRequest | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
   const [accepted, setAccepted] = useState(0);
-  const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
+  const [applicationStatus, setApplicationStatus] = useState<string | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -76,21 +78,25 @@ export default function RequestDetailPage() {
       user?.id === value.creator_id
         ? supabase
             .from("applications")
-            .select("id, applicant_id, message, status, profile:applicant_id(*)")
+            .select(
+              "id, applicant_id, message, status, profile:applicant_id(*)",
+            )
             .eq("request_id", id)
             .order("created_at", { ascending: false })
         : Promise.resolve({ data: [] }),
     ]);
 
     setAccepted(acceptedResult.count ?? 0);
-    setApplicationStatus((ownResult.data as { status: string } | null)?.status ?? null);
+    setApplicationStatus(
+      (ownResult.data as { status: string } | null)?.status ?? null,
+    );
     setApplications(
       (applicantResult.data ?? []).map((application) => ({
         ...application,
         profile: Array.isArray(application.profile)
-          ? application.profile[0] ?? null
+          ? (application.profile[0] ?? null)
           : application.profile,
-      })) as Application[]
+      })) as Application[],
     );
     setLoading(false);
   }, [id, supabase, user]);
@@ -103,33 +109,33 @@ export default function RequestDetailPage() {
     event.preventDefault();
     if (!user) return router.push("/login");
     setSaving(true);
-    const { error } = await supabase
-      .from("applications")
-      .insert({
-        request_id: id,
-        applicant_id: user.id,
-        message: new FormData(event.currentTarget).get("message"),
-        status: "pending",
-      });
+    const { error } = await supabase.from("applications").insert({
+      request_id: id,
+      applicant_id: user.id,
+      message: new FormData(event.currentTarget).get("message"),
+      status: "pending",
+    });
     setSaving(false);
+
     if (error) {
       setMessage(
         error.code === "23505"
           ? "You have already applied to this request."
-          : error.message
+          : error.message,
       );
-    } else {
-      setApplicationStatus("pending");
-      setShowForm(false);
-      setMessage("Application sent successfully.");
+      return;
     }
+
+    setApplicationStatus("pending");
+    setShowForm(false);
+    setMessage("Application sent successfully.");
   }
 
   async function acceptApplicant(application: Application) {
     if (
       !request ||
       !window.confirm(
-        `Accept ${application.profile?.full_name || "this applicant"} into the team?`
+        `Accept ${application.profile?.full_name || "this applicant"} into the team?`,
       )
     )
       return;
@@ -145,6 +151,7 @@ export default function RequestDetailPage() {
       setMessage(error.message);
       return;
     }
+
     if (accepted + 1 >= request.members_needed) {
       const { error: requestError } = await supabase
         .from("requests")
@@ -165,9 +172,14 @@ export default function RequestDetailPage() {
         setMessage(remainingError.message);
         return;
       }
-      setMessage("Applicant accepted. This request is now full and applications are closed.");
+
+      setMessage(
+        "Applicant accepted. This request is now full and applications are closed.",
+      );
     } else {
-      setMessage("Applicant accepted. The request remains open for more members.");
+      setMessage(
+        "Applicant accepted. The request remains open for more members.",
+      );
     }
     setSaving(false);
     await load();
@@ -192,8 +204,11 @@ export default function RequestDetailPage() {
   }
 
   const ownRequest = user?.id === request.creator_id;
-  const unavailable = accepted >= request.members_needed || request.status !== "open";
-  const canApply = Boolean(user && !ownRequest && !applicationStatus && !unavailable);
+  const unavailable =
+    accepted >= request.members_needed || request.status !== "open";
+  const canApply = Boolean(
+    user && !ownRequest && !applicationStatus && !unavailable,
+  );
   const statusClass =
     request.status === "open"
       ? "bg-emerald-50 text-emerald-700"
@@ -219,7 +234,9 @@ export default function RequestDetailPage() {
           </p>
           <div className="mt-3 flex flex-wrap justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-slate-900">{request.title}</h1>
+              <h1 className="text-3xl font-bold text-slate-900">
+                {request.title}
+              </h1>
               <p className="mt-4 whitespace-pre-line leading-7 text-slate-600">
                 {request.description}
               </p>
@@ -268,15 +285,15 @@ export default function RequestDetailPage() {
                   applicationStatus === "accepted"
                     ? "text-emerald-700"
                     : applicationStatus === "rejected"
-                    ? "text-red-700"
-                    : "text-slate-600"
+                      ? "text-red-700"
+                      : "text-slate-600"
                 }`}
               >
                 {applicationStatus === "accepted"
                   ? "You have been accepted into this team."
                   : applicationStatus === "rejected"
-                  ? "This team is now full. You were not selected."
-                  : "Your application is pending."}
+                    ? "This team is now full. You were not selected."
+                    : "Your application is pending."}
               </p>
             )}
             {user && !ownRequest && unavailable && !applicationStatus && (
@@ -302,7 +319,8 @@ export default function RequestDetailPage() {
               Applicants ({applications.length})
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              Only you can see applications to your request. Click an applicant to view their full profile.
+              Only you can see applications to your request. Click an applicant
+              to view their full profile.
             </p>
             <div className="mt-5 space-y-4">
               {applications.length === 0 ? (
@@ -440,7 +458,9 @@ export default function RequestDetailPage() {
 
         {/* Creator Section */}
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
-          <h2 className="text-xl font-bold text-slate-900">About the creator</h2>
+          <h2 className="text-xl font-bold text-slate-900">
+            About the creator
+          </h2>
           <div className="mt-5 flex items-center justify-between gap-4">
             <div className="flex gap-4 items-center">
               {request.creator_id ? (
@@ -507,7 +527,9 @@ export default function RequestDetailPage() {
             )}
           </div>
           {request.profile?.bio && (
-            <p className="mt-5 leading-7 text-slate-600">{request.profile.bio}</p>
+            <p className="mt-5 leading-7 text-slate-600">
+              {request.profile.bio}
+            </p>
           )}
         </section>
 

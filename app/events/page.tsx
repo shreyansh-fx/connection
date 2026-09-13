@@ -25,8 +25,7 @@ const categories = [
   "Other",
 ];
 
-const PERSONAL_EVENT_ID =
-  "fba6a17b-d749-4fad-8ec3-35a1003aafb8";
+const PERSONAL_EVENT_ID = "fba6a17b-d749-4fad-8ec3-35a1003aafb8";
 
 const formatDate = (date: string) =>
   new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", {
@@ -67,12 +66,7 @@ export default function EventsPage() {
   }, [supabase]);
 
   const filteredEvents = events.filter((event) => {
-    const text = [
-      event.name,
-      event.category,
-      event.location,
-      event.description,
-    ]
+    const text = [event.name, event.category, event.location, event.description]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
@@ -88,12 +82,12 @@ export default function EventsPage() {
 
   // All events except Personal Requests are Major Events.
   const majorEvents = filteredEvents.filter(
-    (event) => event.id !== PERSONAL_EVENT_ID
+    (event) => event.id !== PERSONAL_EVENT_ID,
   );
 
   // Only the hardcoded Personal Requests event appears here.
   const personalEvents = filteredEvents.filter(
-    (event) => event.id === PERSONAL_EVENT_ID
+    (event) => event.id === PERSONAL_EVENT_ID,
   );
 
   const renderEventCard = (event: CampusEvent) => (
@@ -125,21 +119,16 @@ export default function EventsPage() {
           )}
         </div>
 
-        <h3 className="mt-4 text-xl font-bold text-slate-900">
-          {event.name}
-        </h3>
+        <h3 className="mt-4 text-xl font-bold text-slate-900">{event.name}</h3>
 
         <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600">
-          {event.description ||
-            "Find collaborators for this campus event."}
+          {event.description || "Find collaborators for this campus event."}
         </p>
 
         <p className="mt-4 text-sm font-medium text-slate-700">
           {event.location || "Location to be announced"}
 
-          <span className="float-right text-indigo-600">
-            Explore →
-          </span>
+          <span className="float-right text-indigo-600">Explore →</span>
         </p>
       </div>
     </a>
@@ -152,9 +141,7 @@ export default function EventsPage() {
       {/* Header */}
       <section className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-12">
-          <p className="text-sm font-semibold text-indigo-600">
-            CAMPUS COLLAB
-          </p>
+          <p className="text-sm font-semibold text-indigo-600">CAMPUS COLLAB</p>
 
           <h1 className="mt-2 text-4xl font-bold tracking-tight text-slate-900">
             Find Your Event
@@ -178,10 +165,11 @@ export default function EventsPage() {
               <button
                 key={item}
                 onClick={() => setCategory(item)}
-                className={`rounded-full px-4 py-2 text-sm font-medium ${category === item
-                  ? "bg-indigo-600 text-white"
-                  : "bg-slate-100 text-slate-700 hover:bg-indigo-50"
-                  }`}
+                className={`rounded-full px-4 py-2 text-sm font-medium ${
+                  category === item
+                    ? "bg-indigo-600 text-white"
+                    : "bg-slate-100 text-slate-700 hover:bg-indigo-50"
+                }`}
               >
                 {item}
               </button>
@@ -193,16 +181,11 @@ export default function EventsPage() {
       {/* Events */}
       <section className="mx-auto max-w-7xl px-6 py-10">
         {loading ? (
-          <p className="py-16 text-center text-slate-500">
-            Loading events…
-          </p>
+          <p className="py-16 text-center text-slate-500">Loading events…</p>
         ) : error ? (
-          <p className="py-16 text-center text-red-600">
-            {error}
-          </p>
+          <p className="py-16 text-center text-red-600">{error}</p>
         ) : (
           <div className="space-y-16">
-
             {/* ================================= */}
             {/* MAJOR EVENTS */}
             {/* ================================= */}
@@ -238,7 +221,7 @@ export default function EventsPage() {
             <section>
               <div className="mb-6">
                 <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-                  Misellaneous
+                  Miscellaneous
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-600">
@@ -258,7 +241,6 @@ export default function EventsPage() {
                 </div>
               )}
             </section>
-
           </div>
         )}
       </section>
