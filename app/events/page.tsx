@@ -118,9 +118,11 @@ export default function EventsPage() {
             {event.category || "Other"}
           </span>
 
-          <span className="text-xs font-medium text-slate-500">
-            {formatDate(event.date)}
-          </span>
+          {event.id !== PERSONAL_EVENT_ID && (
+            <span className="text-xs font-medium text-slate-500">
+              {formatDate(event.date)}
+            </span>
+          )}
         </div>
 
         <h3 className="mt-4 text-xl font-bold text-slate-900">
